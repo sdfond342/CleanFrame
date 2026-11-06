@@ -104,14 +104,18 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000}
 .m-frost .dock .plate.on-lift{background:linear-gradient(170deg,rgba(255,255,255,.34),rgba(255,255,255,.14) 58%,rgba(255,255,255,.16))}
 .bg-photo.db-quiet.m-frost .dock .plate.on-focus{background:linear-gradient(170deg,rgba(255,255,255,.24),rgba(255,255,255,0) 52%,rgba(12,10,8,.08))}
 .bg-photo.db-quiet.m-soft .dock .plate.on-focus,.bg-photo.db-quiet.m-tint .dock .plate.on-focus{background:linear-gradient(170deg,rgba(255,255,255,.30),rgba(255,255,255,.10) 52%,rgba(255,255,255,.08))}
-.tile{position:absolute;left:0;top:16px;width:288px;height:200px;border-radius:32px;transition:transform var(--t) var(--ease)}
+.tile{position:absolute;left:0;top:16px;width:288px;height:200px;border-radius:32px;overflow:hidden;background:rgba(255,255,255,.10);transition:transform var(--t) var(--ease),background-color 140ms linear}
+.bg-light .dock .tile{background:rgba(29,26,22,.06)}
+.dock .tile.has-icon-extend{background:var(--icon-extend)}
+.dock .tile.is-focus.has-icon-extend,.dock .tile.is-lifted.has-icon-extend{box-shadow:inset 0 0 0 3px rgba(255,255,255,.82)}
 .tile.is-outside-icon{opacity:0;pointer-events:none}
 .at-arrange .tile:not(.is-focus):not(.is-lifted){background:rgba(255,255,255,.08)}
 .mark{position:relative;display:block;flex:none}
 .mark img,.mark .mk{position:absolute;max-width:none}.mark img{object-fit:contain}.mark .mk{display:block;background:currentColor;-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}.mark.is-bad>*{visibility:hidden}
 .monogram{display:flex;align-items:center;justify-content:center;font-weight:600;letter-spacing:0;color:inherit}
 .monogram span{position:relative;width:1.65em;height:1.65em;display:flex;align-items:center;justify-content:center;border-radius:.4em}.monogram span::after{content:"";position:absolute;top:0;right:0;bottom:0;left:0;border:2px solid currentColor;border-radius:inherit;opacity:.38}
-.native-icon img{position:absolute;top:0;right:0;bottom:0;left:0;width:100%;height:100%;object-fit:contain;object-position:center}
+.native-icon{overflow:hidden}
+.native-icon img{position:absolute;top:0;right:0;bottom:0;left:0;width:100%;height:100%;max-width:100%;object-fit:contain;object-position:center}
 .native-icon.has-native-icon>span{visibility:hidden}
 .tile .mark{position:absolute;left:96px;top:24px;opacity:.84;transition:opacity 160ms linear,transform var(--t) var(--ease)}
 .tile .label{position:absolute;left:4px;right:4px;top:128px;text-align:center;font-size:36px;line-height:44px;letter-spacing:-.8px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.84;transition:opacity 160ms linear}
@@ -147,12 +151,21 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000}
 .l-list .dock,.l-list .cue,.l-list .dock-action{display:none}
 .dock.is-clear .mat{visibility:hidden}
 .input-row{position:absolute;left:0;width:1920px;height:88px;z-index:4}
-.input-tile{position:absolute;top:0;height:88px;border-radius:24px;background:rgba(8,12,14,.5);color:#f6f1e7;box-shadow:inset 0 1px 0 rgba(255,255,255,.22)}
+.input-tile{position:absolute;top:0;height:88px;border-radius:24px;display:flex;align-items:center;justify-content:center;background:rgba(8,12,14,.5);color:#f6f1e7;box-shadow:inset 0 1px 0 rgba(255,255,255,.22)}
 .input-tile.is-focus{background:rgba(246,241,231,.92);color:#1d1a16;box-shadow:none}
-.input-tile span{display:block;padding:0 16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:88px;text-align:center;font-size:30px;font-weight:500;letter-spacing:-.5px}
+.input-tile{overflow:hidden}
+.input-name{display:block;flex:1;min-width:0;padding:0 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:28px;font-weight:500;letter-spacing:-.5px}
+.input-glyph{width:44px;height:44px;max-width:44px;max-height:44px;object-fit:contain;object-position:center;flex:none;pointer-events:none}
+.i-icons .input-glyph{width:56px;height:56px;max-width:56px;max-height:56px}
+.input-tile.is-focus .input-glyph{filter:invert(1)}
 .input-row.is-list{height:64px}
 .input-row.is-list .input-tile{height:64px;border-radius:20px}
-.input-row.is-list .input-tile span{line-height:64px;font-size:26px}
+.input-row.is-list .input-name{font-size:24px}
+.input-row.is-list .input-glyph{width:32px;height:32px}
+.input-row.is-empty{visibility:hidden}
+.er .input-glyph{width:36px;height:36px;margin:0 12px 0 8px}
+.er.is-hidden{opacity:.45}
+.bg-light .er .input-glyph{filter:invert(1)}
 
 /* Shared whole-row cues for the app library and two-column editor. */
 .row-cue{position:absolute;width:40px;height:40px;display:none;align-items:center;justify-content:center;color:var(--mute);pointer-events:none}
@@ -266,7 +279,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000}
 .grid-before.is-manage{top:452px}
 .grid-after{top:976px}
 .grid-in{position:absolute;left:0;top:0;width:1696px;transition:transform 220ms var(--ease);will-change:transform}
-.gt{position:absolute;left:0;top:0;width:320px;height:216px;border-radius:32px;transition:background-color 140ms linear}
+.gt{position:absolute;left:0;top:0;width:320px;height:216px;border-radius:32px;overflow:hidden;background:rgba(255,255,255,.06);transition:background-color 140ms linear}
+.bg-light .gt{background:rgba(29,26,22,.05)}
+.gt.has-icon-extend{background:var(--icon-extend)}
 .gt.is-focus{background:var(--plate);box-shadow:var(--plate-edge)}
 .gt .mark{position:absolute;left:100px;top:30px;opacity:.88;transition:opacity 160ms linear,transform var(--t) var(--ease)}
 .gt.is-focus .mark{opacity:1;transform:translateY(-3px) scale(1.04)}
@@ -523,7 +538,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000}
 .is-horizontal .setting-tick .ico{width:26px;height:26px}
 .section-material .setting-choice:last-child{flex:1.4}
 .detail-background .section-rotation .setting-choice{padding-left:128px}
-.detail-layout .setting-section+.setting-section,.detail-focus .setting-section+.setting-section{margin-top:64px}
+.detail-layout .setting-section+.setting-section{margin-top:14px}
+.detail-focus .setting-section+.setting-section{margin-top:64px}
+.detail-layout .setting-label{margin-bottom:6px;font-size:24px;line-height:30px}
+.detail-layout .setting-choice{min-height:68px;padding:8px 14px;font-size:30px}
+.detail-layout .is-compact{margin-top:6px}
+.input-icon-name{flex:none;width:148px;align-self:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:22px;line-height:28px;font-weight:500}
+.detail-layout .is-compact .setting-choice{min-height:44px;padding:4px 4px;font-size:18px;line-height:24px}
+.detail-layout .is-compact .setting-tick,.detail-layout .is-compact .setting-tick .ico{width:18px;height:18px}
 .detail-typography .setting-choice,.detail-rotation .setting-choice{min-height:88px}
 .detail-typography .appearance-rows,.detail-rotation .appearance-rows,.detail-samsung .appearance-rows{top:260px}
 .setting-choice.has-description{min-height:120px}

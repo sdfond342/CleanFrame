@@ -17,13 +17,13 @@ Settings opens a grouped overview: Background, Layout, Typography, Focus, Apps o
 | Group | Choices |
 | --- | --- |
 | Background | Photo, Light, Dark; Wallpaper and Rotation when Photo is active |
-| Layout | List or Dock; independent Text, Icons or Both choices for apps and Home controls; Dock background Glass or Clear |
+| Layout | List or Dock; Text, Icons or Both for apps, Home controls and the input row; Dock background Glass or Clear; Auto or a chosen input icon |
 | Typography | Manrope, Neue Montreal, Mori, Pangram Sans, Geist and Newsreader, when available |
 | Focus | Type or Glass; Soft, Frost or Clear tint material |
 | Apps on Home | Membership and arrangement editor |
 | Samsung | Samsung Home, TV settings and Inputs |
 
-Up/Down moves between rows. Left/Right moves between choices in a horizontal row. Focus alone changes neither the preview nor saved preferences in these appearance groups. Wallpaper has its own temporary photo preview, described below. OK applies the focused value. A checkmark identifies the applied value; the filled plate identifies remote focus. Applying the current value does not write again.
+Up/Down moves between rows. Left/Right moves between choices in a horizontal row. Focus alone changes neither the preview nor saved preferences in these appearance groups. Wallpaper has its own temporary photo preview, described below. OK applies the focused value. A checkmark identifies the applied value; the filled plate identifies remote focus. Applying the current value does not write again. Settings does not keep a footer that describes the OK action.
 
 Material applies to a photographic Dock, or Glass focus on a photographic List. Inactive material choices remain visible with an explanation and are skipped during navigation. Their stored value is retained. Wallpaper and rotation are also inactive on flat backgrounds.
 
@@ -47,7 +47,8 @@ Open the editor from Settings or All apps. Apps shows the current order on the l
 
 - Reorder: OK on a name picks it up. Up/Down moves it inside its own group. OK places it and saves the order. Back puts an unplaced row back without saving that move.
 - Remove: Right from an app name reaches Remove from Home. OK saves the removal and moves focus to the same app in Recently removed. The app stays installed.
-- Rename: Right from an HDMI name reaches Rename. OK opens the on-screen keyboard. Done saves that launcher label immediately. Cancel or Back discards only the unfinished name. The television source name is unchanged.
+- Rename: Hold OK on an input name, or hold a click on its home tile. The on-screen keyboard opens. Done saves that launcher label immediately. Cancel or Back discards only the unfinished name. A short OK still activates a visible home input. Holding OK does not switch the source when it is released, repeated, or when the keyboard closes.
+- Hide: Right from an input name reaches Hide or Show. Hiding keeps the port, order and launcher name, and removes that tile from the home row. Showing it puts the tile back. Hiding the last visible input leaves focus on the Home controls.
 - Add: OK on an app in Not on Home adds it and saves. A recently removed app returns to its previous position within the editing session; another app is added at the end. Focus follows the app to its Remove from Home control, so another OK can reverse the addition.
 - Undo reverses a completed addition, removal or reorder from the current editing session. Done or Back closes the editor and keeps completed changes. Undo history ends when the editor closes.
 
@@ -69,7 +70,7 @@ Installed-app discovery allows up to 20 seconds for large TV catalogues; launch 
 
 ## HDMI inputs
 
-The launcher has its own HDMI row above the app row. Its initial launcher labels are HDMI1, HDMI2, Kodi and HDMI4, for public source numbers 1, 2, 3 and 4. Those labels are stored with the launcher and do not rename the television source. Apps on Home reorders and renames them with the same move controls as the apps. OK on a home-row tile asks the public TV window API for that port number only after the TV reports it; a missing port stays an error. Settings → Samsung → Inputs still reads the live connected and disconnected records, including sleeping devices that may be listed as disconnected. It does not invent ports beyond what the TV returns. Missing APIs, denied access and discovery failure produce an unavailable/error state. The active source comes from the synchronous `tvwindow.getSource()` return value. Switching on this set still needs a device test.
+The launcher has its own HDMI row above the app row. Its initial launcher labels are HDMI1, HDMI2, Kodi and HDMI4, for public source numbers 1, 2, 3 and 4. Those labels are stored with the launcher and do not rename the television source. Apps on Home reorders them with the same move controls as the apps. A short OK on a visible home tile asks the public TV window API for that port number only after the TV reports it; a missing port stays an error. Holding OK renames the launcher label instead. Layout can show input tiles as text, an icon, or both. Auto chooses a bundled Nintendo Switch, Xbox, Xbox 360 or Kodi mark from the label, with Xbox 360 taking precedence over Xbox, and uses a generic port mark otherwise. Each input can override that choice. The marks are stored in the widget. Xbox 360 and the generic port mark are original drawings, not the owners' logos. App and input tiles fill their rounded rectangle; the logo stays at its own proportions. An installed icon that is one flattened picture is shown whole. Its edge color may fill the rest of the tile when the picture allows that read. The picture is not cropped or stretched, and its layers are not separated. Settings → Samsung → Inputs still reads the live connected and disconnected records, including sleeping devices that may be listed as disconnected. It does not invent ports beyond what the TV returns. Missing APIs, denied access and discovery failure produce an unavailable/error state. The active source comes from the synchronous `tvwindow.getSource()` return value. Switching on this set still needs a device test.
 
 Up/Down selects an input. OK requests that exact source; Back returns to Samsung Settings. Retry after a failed load rereads the available sources. A routing error remains an error, and a failed handoff leaves the launcher usable. Timed-out or cancelled requests cannot start a later routing or viewer action; a native request already sent to the TV may itself be uncancellable.
 

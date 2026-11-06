@@ -19,6 +19,8 @@ The public app uses Manrope, Geist and Newsreader. A personal widget containing 
 | Simple Icons service marks | CC0; exact revisions and adaptations in `app/assets/icons/SOURCES.json` and `ADDITIONAL-SOURCES.json`. The CC0 text is retained beside the icons. |
 | Disney+, ABC and SBS marks | [Custom Brand Icons](https://github.com/elax46/custom-brand-icons), MIT. The retained licence is `app/assets/icons/CUSTOM-BRAND-ICONS-LICENSE.txt`. ABC and SBS sources were replaced during the public-source review. Exact revisions, source files and extraction/recolour notes are in `SOURCES.json`. |
 | Art, apps, settings and home outlines | Original CleanFrame drawings, covered by the project's MIT licence. |
+| Input marks for Nintendo Switch, Xbox and Kodi | Simple Icons 11.15.0, CC0, recolored white. Exact files are `app/assets/icons/inputs/`. |
+| Xbox 360 numeral and HDMI port outline | Original CleanFrame drawings, not the owners' logos. |
 
 Brand marks identify services. Their owners retain trademark rights; this project claims no endorsement or affiliation. The older Australian TV icon archive's GPL text is retained for historical provenance only; no current icon uses that archive.
 

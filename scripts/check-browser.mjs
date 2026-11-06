@@ -149,7 +149,7 @@ async function group(name) {
 }
 const settingsSnapshot = () => current.evaluate(() => {
   const s = ShoreQA.state();
-  const rendered = [...document.getElementById('stage').classList].filter(c => /^(bg|l|a|u|f|m|font)-/.test(c)).sort();
+  const rendered = [...document.getElementById('stage').classList].filter(c => /^(bg|l|a|u|f|m|font|i)-/.test(c)).sort();
   return { stored: localStorage.getItem('cleanframe.home.v1'), committed: s.committed, shown: s.shown, rendered, writes: s.writes, storageAttempts: window.__storageAttempts };
 });
 const choice = (axis, value) => act('choice.' + axis + '.' + value);
@@ -507,13 +507,14 @@ try {
     check('Unfinished input move does not write', (await stored()).inputs.join(',') === moved);
     await nav('back');
     check('Back puts the unplaced input back', (await stored()).inputs.join(',') === moved && (await call('where')).focusAction === 'editor.input.move.2');
-    await act('editor.input.move.3'); await nav('back', 'right', 'ok');
+    await act('editor.input.move.3'); await nav('back');
+    await current.keyboard.down('Enter'); await current.waitForTimeout(650); await current.keyboard.up('Enter');
     check('Rename opens the in-app keyboard without a text field', await current.evaluate(() => !document.querySelector('input, textarea') && !!document.querySelector('[data-action="editor.key.done"]')));
     await current.keyboard.press('Backspace'); await current.keyboard.press('Backspace'); await current.keyboard.press('Backspace'); await current.keyboard.press('Backspace');
     for (const letter of 'Cinema') await current.keyboard.press(letter);
     await act('editor.key.done');
     check('Done saves the launcher name and keeps port 3', (await stored()).inputNames['3'] === 'Cinema' && (await stored()).inputs.includes(3) && (await call('where')).focusAction === 'editor.input.move.3');
-    await act('editor.input.rename.3');
+    await current.keyboard.down('Enter'); await current.waitForTimeout(650); await current.keyboard.up('Enter');
     await current.keyboard.press('Z');
     await nav('back');
     check('Back cancels only the unfinished rename', (await stored()).inputNames['3'] === 'Cinema' && !(await current.locator('#stage').innerText()).includes('Discard'));
@@ -558,10 +559,60 @@ try {
       await current.screenshot({ path: out + 'editor-inputs-' + width + '.png' });
       await nav('ok');
       await current.screenshot({ path: out + 'editor-moving-' + width + '.png' });
-      await nav('back', 'right', 'ok');
+      await nav('back');
+      await current.keyboard.down('Enter'); await current.waitForTimeout(650); await current.keyboard.up('Enter');
       await current.screenshot({ path: out + 'editor-keyboard-' + width + '.png' });
       await nav('back', 'back');
     }
+  });
+  await run('Input hold, hide and local icons', async () => {
+    await page();
+    const glyph = port => current.evaluate(p => { const img = document.querySelector('[data-action="home.input.' + p + '"] img'); return img ? img.getAttribute('src') : ''; }, port);
+    check('A Kodi label uses the bundled Kodi mark', (await glyph(3)).endsWith('/inputs/kodi.svg'));
+    check('Unmatched HDMI labels use the generic mark', (await glyph(1)).endsWith('/inputs/hdmi.svg') && (await glyph(4)).endsWith('/inputs/hdmi.svg'));
+    check('Input marks are local files', await current.evaluate(() => !performance.getEntriesByType('resource').some(r => /simple-icons|raw\.githubusercontent/.test(r.name)) && performance.getEntriesByType('resource').some(r => r.name.includes('/assets/icons/inputs/kodi.svg'))));
+    await scene('settings');
+    check('Settings overview has no OK footer', await current.evaluate(() => !document.querySelector('.settings-overview-hint') && !/Open selected group/.test(document.getElementById('stage').innerText)));
+    await group('layout');
+    check('Layout has no OK footer', (await current.locator('#appearanceDesc').innerText()).trim() === '');
+    await act('inputicon.3.switch');
+    await scene('home');
+    check('A manual icon overrides the name', (await glyph(3)).endsWith('/inputs/switch.svg') && (await stored()).inputIcons['3'] === 'switch' && (await stored()).inputNames['3'] == null);
+    await group('layout'); await act('inputicon.3.auto'); await scene('home');
+    check('Auto follows the Kodi name again', (await glyph(3)).endsWith('/inputs/kodi.svg') && !(await stored()).inputIcons['3']);
+    await nav('up', 'right');
+    const calls = await current.evaluate(() => __tv.calls.length);
+    await current.keyboard.down('Enter'); await current.keyboard.up('Enter');
+    await current.waitForFunction(() => __tv.calls.some(c => c.method === 'setSource' && c.number === 2));
+    check('A short OK switches only the focused port', await current.evaluate(start => __tv.calls.filter(c => c.method === 'setSource').length === 1 && __tv.calls.at(-2).number === 2 && __tv.calls.length === start + 2, calls));
+    await current.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await scene('home'); await nav('up');
+    const held = await current.evaluate(() => __tv.calls.length);
+    await current.keyboard.down('Enter');
+    await current.waitForTimeout(650);
+    await current.keyboard.up('Enter');
+    check('A held OK opens rename and never switches source', (await call('where')).view === 'editor' && (await current.locator('[data-action="editor.key.done"]').count()) === 1 && await current.evaluate(start => __tv.calls.length === start, held));
+    for (let i = 0; i < 5; i++) await current.keyboard.press('Backspace');
+    for (const letter of 'Xbox 360') await current.keyboard.press(letter);
+    await act('editor.key.done');
+    const savedRename = { where: await call('where'), name: (await stored()).inputNames, glyph: await glyph(2), calls: await current.evaluate(start => __tv.calls.length - start, held) };
+    check('Done saves immediately and returns without switching', savedRename.where.view === 'home' && savedRename.where.focusAction === 'home.input.2' && savedRename.name['2'] === 'Xbox 360' && savedRename.glyph.endsWith('/inputs/xbox360.svg') && savedRename.calls === 0, savedRename);
+    await current.locator('[data-action="home.input.2"]').hover();
+    await current.mouse.down(); await current.waitForTimeout(650); await current.mouse.up();
+    check('A long click opens rename and does not switch on release', (await call('where')).view === 'editor' && await current.evaluate(start => __tv.calls.length === start, held));
+    await current.keyboard.press('Escape');
+    check('Cancel from a long click drops the draft and stays on that input', (await call('where')).focusAction === 'home.input.2' && (await stored()).inputNames['2'] === 'Xbox 360' && await current.evaluate(start => __tv.calls.length === start, held));
+    const beforeClick = await current.evaluate(() => __tv.calls.filter(c => c.method === 'setSource').length);
+    await current.locator('[data-action="home.input.2"]').click();
+    await current.waitForFunction(start => __tv.calls.filter(c => c.method === 'setSource').length === start + 1, beforeClick);
+    await current.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await editor();
+    for (const port of [1, 2, 3, 4]) { await act('editor.input.move.' + port); await nav('back', 'right', 'ok'); }
+    check('Hiding every input keeps ports, order and names', (await stored()).inputs.join(',') === '1,2,3,4' && (await stored()).inputHidden.slice().sort().join(',') === '1,2,3,4' && (await stored()).inputNames['2'] === 'Xbox 360');
+    await nav('back'); await scene('home'); await nav('up');
+    check('Hiding the last input leaves focus on a Home control', (await call('where')).zone === 'util' && String((await call('where')).focusAction || '').startsWith('util.') && (await current.locator('#inputRow .input-tile').count()) === 0);
+    await editor(); await act('editor.input.move.2'); await nav('back', 'right', 'ok'); await nav('back'); await scene('home');
+    check('Showing an input restores its tile and saved name', (await current.locator('#inputRow .input-tile').allTextContents()).join(',') === 'Xbox 360' && (await stored()).inputs.includes(2) && (await stored()).inputNames['2'] === 'Xbox 360');
   });
   await run('Independent app identity self-filter', async () => {
     const appId = 'AbCdEf1234.MyHome';
@@ -606,6 +657,13 @@ try {
     await scene('home');
     await current.waitForFunction(() => { const img = document.querySelector('[data-action="home.app.netflix"] img'); return img && img.complete && img.naturalWidth > 0; });
     check('Home tile uses the same installed icon', await current.evaluate(() => { const img = document.querySelector('[data-action="home.app.netflix"] img'); return !!img && img.getAttribute('alt') === '' && document.querySelector('[data-action="home.app.netflix"]').getAttribute('aria-label') === 'Netflix'; }));
+    check('A wide tile keeps the installed icon contained', await current.evaluate(() => {
+      const tile = document.querySelector('[data-action="home.app.netflix"]'), img = tile && tile.querySelector('img');
+      if (!tile || !img) return false;
+      const tileBox = tile.getBoundingClientRect(), image = img.getBoundingClientRect();
+      const bg = getComputedStyle(tile).backgroundColor;
+      return getComputedStyle(img).objectFit === 'contain' && tileBox.width > tileBox.height * 1.4 && image.width <= tileBox.width && image.height <= tileBox.height && bg !== 'rgba(0, 0, 0, 0)';
+    }));
     await editor();
     check('Editor uses the installed icon without dropping the name', await current.evaluate(() => { const row = document.querySelector('[data-action="editor.move.netflix"]'); const img = row && row.querySelector('img'); return !!img && img.complete && img.naturalWidth > 0 && row.textContent.includes('Netflix'); }));
     await closePage();
@@ -702,7 +760,7 @@ try {
     check('Overview has the settings groups', same((await call('actions')).filter(a => expected.includes(a)).sort(), expected.slice().sort()));
     const specs = {
       background: { bg: ['dark', 'light', 'photo'] },
-      layout: { layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], controls: ['icons', 'both', 'text'], shelf: ['glass', 'clear'] },
+      layout: { layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], controls: ['icons', 'both', 'text'], shelf: ['glass', 'clear'], inputStyle: ['text', 'icons', 'both'] },
       typography: { font: (await state()).fonts.available },
       focus: { focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'] }
     };
@@ -982,14 +1040,14 @@ try {
   });
   await run('Wallpaper applies in place and Back keeps the latest applied photo', async () => {
     await page(); await wallpaper(); const before = await wallpaperSaved();
-    check('Applied wallpaper omits the redundant Apply hint', !/apply.*photo/i.test(await current.locator('#appearanceDesc').innerText()));
+    check('Wallpaper has no OK-action footer', (await current.locator('#appearanceDesc').innerText()).trim() === '');
     await nav('down'); await wallpaperSettled(walls[1].id);
     check('A browsed photo is not saved by focus', same(await wallpaperSaved(), before));
-    check('Unsaved preview explains the OK action', /apply.*photo/i.test(await current.locator('#appearanceDesc').innerText()));
+    check('An unsaved wallpaper preview still has no OK footer', (await current.locator('#appearanceDesc').innerText()).trim() === '');
     await nav('ok'); await ready();
     const applied = await wallpaperSaved();
     check('OK applies once while staying inside Wallpaper', (await state()).view === 'wallpaper' && applied.committed.wall === walls[1].id && applied.writes === before.writes + 1 && applied.attempts === before.attempts + 1 && same(await wallpaperApplied(), ['wallpaper.choose.' + walls[1].id]));
-    check('Successful apply clears its redundant Apply hint', !/apply.*photo/i.test(await current.locator('#appearanceDesc').innerText()));
+    check('Applying a wallpaper leaves the OK footer empty', (await current.locator('#appearanceDesc').innerText()).trim() === '');
     check('Applied photo updates the committed Settings backdrop', applied.backdrop.src.includes('/' + walls[1].id + '-panel.jpg'));
     await nav('ok'); await current.keyboard.down('Enter'); await current.keyboard.down('Enter'); await current.keyboard.up('Enter');
     check('Repeated OK on the applied photo is a no-op', same(await wallpaperSaved(), applied));
@@ -1008,7 +1066,7 @@ try {
     await page(); await wallpaper(); const before = await wallpaperSaved();
     await nav('up');
     check('Up from the first wallpaper reaches Back without wrapping', (await state()).focusAction === 'wallpaper.back' && (await state()).shown.wall === walls[0].id);
-    check('Back still shows its return hint', /background|return/i.test(await current.locator('#appearanceDesc').innerText()));
+    check('Wallpaper Back has no OK footer', (await current.locator('#appearanceDesc').innerText()).trim() === '' && (await call('where')).focusAction === 'wallpaper.back');
     await nav('down');
     check('Down from Back restores the current candidate', (await state()).focusAction === 'wallpaper.choose.' + walls[0].id);
     await nav(...Array(walls.length - 1).fill('down')); await wallpaperSettled(walls.at(-1).id); await wallpaperRowVisible(walls.at(-1).id);

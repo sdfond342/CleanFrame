@@ -44,7 +44,9 @@
     newsreader: { name: 'Newsreader', family: 'Study Newsreader', display: 400, ui: 400, clock: 400 }
   };
   var PRIVATE_FONTS = window.CleanFramePrivateFontIDs || [], fontMetrics = {}, unavailableFonts = {}, widthCache = {}, fontRevision = 0, fontsReady = false;
-  var LOOK_VALUES = { bg: ['dark', 'light', 'photo'], layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], font: Object.keys(FONTS).filter(function (id) { return id === 'manrope' || PRIVATE_FONTS.indexOf(id) >= 0; }), controls: ['icons', 'both', 'text'], focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'], shelf: ['glass', 'clear'] };
+  var LOOK_VALUES = { bg: ['dark', 'light', 'photo'], layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], font: Object.keys(FONTS).filter(function (id) { return id === 'manrope' || PRIVATE_FONTS.indexOf(id) >= 0; }), controls: ['icons', 'both', 'text'], focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'], shelf: ['glass', 'clear'], inputStyle: ['text', 'icons', 'both'] };
+  var INPUT_ICON_CHOICES = ['auto', 'hdmi', 'switch', 'xbox', 'xbox360', 'kodi'];
+  var INPUT_HOLD_MS = 520;
   var LOOK_NAMES = { bg: 'Background', layout: 'Layout', apps: 'Apps', font: 'Font', controls: 'Home controls', focus: 'Focus', material: 'Material', shelf: 'Dock background' };
   var VALUE_NAMES = { dark: 'Dark', light: 'Light', photo: 'Photo', list: 'List', dock: 'Dock', type: 'Type', glass: 'Glass', soft: 'Soft', frost: 'Frost', tint: 'Clear tint', icons: 'Icons', both: 'Icons and text', text: 'Text', clear: 'Clear' };
   var UTIL = { apps: ['All apps', 'apps'], arrange: ['Arrange', 'arrange'], settings: ['Settings', 'settings'] };
@@ -85,7 +87,7 @@
     for (var i = 0; i < list.length; i++) if (list[i].toLowerCase() === v) return list[i];
     return fallback;
   }
-  function lookOf(c) { return { bg: c.bg, wall: c.wall, layout: c.layout, apps: c.apps, font: c.font, controls: c.controls, focus: c.focus, material: c.material, shelf: c.shelf || 'glass' }; }
+  function lookOf(c) { return { bg: c.bg, wall: c.wall, layout: c.layout, apps: c.apps, font: c.font, controls: c.controls, focus: c.focus, material: c.material, shelf: c.shelf || 'glass', inputStyle: c.inputStyle || 'both' }; }
   function defaultInputName(port) {
     if (port === 1) return 'HDMI1';
     if (port === 2) return 'HDMI2';
@@ -125,6 +127,40 @@
   function inputLabel(port, names) {
     var custom = (names || S.c.inputNames || {})[String(port)];
     return custom || defaultInputName(port);
+  }
+  function cleanInputIcons(saved) {
+    var out = {}, i, port, value;
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return out;
+    for (i = 0; i < INPUT_PORTS.length; i++) {
+      port = INPUT_PORTS[i];
+      value = saved[String(port)];
+      if (INPUT_ICON_CHOICES.indexOf(value) >= 0 && value !== 'auto') out[String(port)] = value;
+    }
+    return out;
+  }
+  function cleanInputHidden(saved) {
+    var out = [], seen = {}, i, port;
+    if (!Array.isArray(saved)) return out;
+    for (i = 0; i < saved.length; i++) {
+      port = saved[i];
+      if (INPUT_PORTS.indexOf(port) >= 0 && !seen[port]) { seen[port] = true; out.push(port); }
+    }
+    return out;
+  }
+  function isInputHidden(port) { return (S.c.inputHidden || []).indexOf(port) >= 0; }
+  function visibleInputs() { return (S.c.inputs || INPUT_PORTS).filter(function (port) { return !isInputHidden(port); }); }
+  function matchInputIcon(label) {
+    var s = String(label || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (s.indexOf('xbox360') >= 0 || s.indexOf('x360') >= 0 || (s.indexOf('xbox') >= 0 && s.indexOf('360') >= 0)) return 'xbox360';
+    if (s.indexOf('xbox') >= 0) return 'xbox';
+    if (s.indexOf('switch') >= 0) return 'switch';
+    if (s.indexOf('kodi') >= 0) return 'kodi';
+    return 'hdmi';
+  }
+  function inputIconChoice(port) { return (S.c.inputIcons || {})[String(port)] || 'auto'; }
+  function resolvedInputIcon(port) {
+    var choice = inputIconChoice(port);
+    return choice === 'auto' ? matchInputIcon(inputLabel(port)) : choice;
   }
   function materialApplies(c) { c = c || S.c; return c.bg === 'photo' && (c.layout === 'dock' || c.focus === 'glass'); }
 
@@ -344,11 +380,34 @@
     el.innerHTML = renderContent();
     el._sig = sig;
     Array.prototype.forEach.call(el.querySelectorAll('[data-native-icon]'), function (img) {
-      function ready() { img.parentNode.classList.add('has-native-icon'); }
+      function ready() { img.parentNode.classList.add('has-native-icon'); extendIconBackground(img); }
       function failed() { img.style.display = 'none'; img.parentNode.classList.remove('has-native-icon'); }
       img.onload = ready; img.onerror = failed;
       if (img.complete) { if (img.naturalWidth) ready(); else failed(); }
     });
+  }
+  /* One sample when an installed icon loads. A flattened square picture keeps its
+     own pixels; only an opaque edge color may fill the rest of the rounded tile. */
+  function extendIconBackground(img) {
+    var canvas, ctx, size = 12, data, x, y, p, r = 0, g = 0, b = 0, n = 0, transparent = 0, tile = img.parentNode;
+    while (tile && tile !== document.body && !/(?:^|\s)(?:tile|gt|ph-row|sc|er)(?:\s|$)/.test(tile.className || '')) tile = tile.parentNode;
+    if (!tile || tile === document.body) return;
+    try {
+      canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, size, size);
+      data = ctx.getImageData(0, 0, size, size).data;
+    } catch (e) { return; }
+    for (y = 0; y < size; y++) for (x = 0; x < size; x++) {
+      if (x && y && x !== size - 1 && y !== size - 1) continue;
+      p = (y * size + x) * 4;
+      if (data[p + 3] < 220) { transparent++; continue; }
+      r += data[p]; g += data[p + 1]; b += data[p + 2]; n++;
+    }
+    if (n < 8 || transparent > n) return;
+    tile.style.setProperty('--icon-extend', 'rgb(' + Math.round(r / n) + ',' + Math.round(g / n) + ',' + Math.round(b / n) + ')');
+    if (tile.className.indexOf('has-icon-extend') < 0) tile.className += ' has-icon-extend';
   }
   function setHTML(el, html) { if (el._html !== html) { el._html = html; el.innerHTML = html; } }
   function attrs(el, z, i, action) { el.setAttribute('data-z', z); el.setAttribute('data-i', String(i)); el.setAttribute('data-action', action); }
@@ -385,11 +444,11 @@
     return {
       bg: pick(modern.bg, LOOK_VALUES.bg, legacyList ? 'dark' : 'photo'), layout: pick(modern.layout, LOOK_VALUES.layout, legacyList ? 'list' : 'dock'),
       apps: pick(modern.apps, LOOK_VALUES.apps, legacyList ? 'text' : 'both'), controls: pick(modern.controls, LOOK_VALUES.controls, 'both'),
-      focus: pick(modern.focus, LOOK_VALUES.focus, legacyList ? 'type' : 'glass'), material: pick(modern.material, LOOK_VALUES.material, 'soft'), shelf: pick(modern.shelf, LOOK_VALUES.shelf, 'glass'),
+      focus: pick(modern.focus, LOOK_VALUES.focus, legacyList ? 'type' : 'glass'), material: pick(modern.material, LOOK_VALUES.material, 'soft'), shelf: pick(modern.shelf, LOOK_VALUES.shelf, 'glass'), inputStyle: pick(modern.inputStyle, LOOK_VALUES.inputStyle, 'both'),
       font: pick(modern.font, LOOK_VALUES.font, 'manrope'), wall: wall(modern.wall || s.wallpaper) ? modern.wall || s.wallpaper : WALLS[0].id,
       home: h, recent: recent, lastApp: h.indexOf(s.lastApp) >= 0 ? s.lastApp : h[0],
       mode: pick(s.mode, MODES.map(function (m) { return m.id; }), 'fixed'),
-      inputs: cleanInputOrder(s.inputs), inputNames: cleanInputNames(s.inputNames)
+      inputs: cleanInputOrder(s.inputs), inputNames: cleanInputNames(s.inputNames), inputIcons: cleanInputIcons(s.inputIcons), inputHidden: cleanInputHidden(s.inputHidden)
     };
   }
   function serialise(c) {
@@ -399,6 +458,8 @@
     out.theme = c.layout === 'list' ? 'list' : 'shore';
     out.inputs = (c.inputs || INPUT_PORTS).slice();
     out.inputNames = copyInputNames(c.inputNames);
+    out.inputIcons = cleanInputIcons(c.inputIcons);
+    out.inputHidden = cleanInputHidden(c.inputHidden);
     out.appRecords = [];
     c.home.concat(c.recent).forEach(function (key) {
       var a = app(key);
@@ -421,6 +482,8 @@
     c.home = home; c.recent = recent; c.lastApp = S.c.lastApp; c.mode = S.c.mode;
     c.inputs = (S.c.inputs || INPUT_PORTS).slice();
     c.inputNames = copyInputNames(S.c.inputNames);
+    c.inputIcons = cleanInputIcons(S.c.inputIcons);
+    c.inputHidden = cleanInputHidden(S.c.inputHidden);
     return c;
   }
   function snap() { return { home: S.c.home.slice(), recent: S.c.recent.slice() }; }
@@ -592,7 +655,7 @@
         else if (k === x.next && f.u < U.length - 1) f.u++;
         else if (k === 'back') f.zone = 'apps';
         else if (k === x.inn) {
-          if (S.c.inputs.length) { f.zone = 'inports'; f.p = clamp(f.p || 0, 0, S.c.inputs.length - 1); }
+          if (visibleInputs().length) { f.zone = 'inports'; f.p = clamp(f.p || 0, 0, visibleInputs().length - 1); }
           else f.zone = 'apps';
         }
         else if (k === 'ok') { S.lastUtil = f.u; utilAction(U[f.u]); return; }
@@ -601,7 +664,7 @@
       }
       f.zone = 'apps';
       if (k === x.out) {
-        if (S.c.inputs.length) { f.zone = 'inports'; f.p = clamp(f.p || 0, 0, S.c.inputs.length - 1); }
+        if (visibleInputs().length) { f.zone = 'inports'; f.p = clamp(f.p || 0, 0, visibleInputs().length - 1); }
         else { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
       }
       else if (k === 'back') openMessage('leave');
@@ -620,13 +683,14 @@
     }
   };
   function inputRowKey(t, k) {
-    var ports = S.c.inputs, p = clamp(t.f.p || 0, 0, Math.max(0, ports.length - 1));
+    var ports = visibleInputs(), p = clamp(t.f.p || 0, 0, Math.max(0, ports.length - 1));
+    if (!ports.length) { t.f.zone = 'apps'; return; }
     t.f.p = p;
     if (k === 'left' && p > 0) t.f.p--;
     else if (k === 'right' && p < ports.length - 1) t.f.p++;
     else if (k === 'down' || k === 'back') t.f.zone = 'apps';
     else if (k === 'up' && S.c.layout !== 'list') { t.f.zone = 'util'; t.f.u = clamp(S.lastUtil, 0, utils().length - 1); }
-    else if (k === 'ok' && ports.length) perform(inputLabel(ports[p]), function (done) { FrameDevice.setSource(ports[p], done); });
+    else if (k === 'ok') perform(inputLabel(ports[p]), function (done) { FrameDevice.setSource(ports[p], done); });
   }
   function listHomeKey(t, k, i, U) {
     var f = t.f, h = S.c.home;
@@ -642,7 +706,7 @@
     }
     f.zone = 'apps';
     if (k === 'up' && i > 0) setSel(h[i - 1]);
-    else if (k === 'up' && S.c.inputs.length) { f.zone = 'inports'; f.p = clamp(f.p || 0, 0, S.c.inputs.length - 1); }
+    else if (k === 'up' && visibleInputs().length) { f.zone = 'inports'; f.p = clamp(f.p || 0, 0, visibleInputs().length - 1); }
     else if (k === 'right') { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
     else if (k === 'down' && i < h.length - 1) setSel(h[i + 1]);
     else if (k === 'back') openMessage('leave');
@@ -806,7 +870,36 @@
   }
   function kbInsert(t, ch) { t.kbText = ((t.kbText || '') + ch).replace(/[\u0000-\u001f]/g, '').slice(0, 24); }
   function kbAction(key) { return 'editor.key.' + (key === "'" ? 'apos' : key === '"' ? 'quot' : key); }
-  function closeInputKeyboard(t, part) { t.renaming = false; t.f.zone = 'inputs'; t.f.part = part || 'rename'; }
+  function closeInputKeyboard(t, part) {
+    var backHome = t.renameHome, port = t.renamePort, home, visible, idx;
+    t.renaming = false;
+    t.renameHome = false;
+    if (backHome) {
+      pop();
+      home = top();
+      if (home && home.id === 'home') {
+        visible = visibleInputs();
+        idx = visible.indexOf(port);
+        if (idx >= 0) { home.f.zone = 'inports'; home.f.p = idx; }
+        else home.f.zone = 'apps';
+      }
+      return;
+    }
+    t.f.zone = 'inputs';
+    t.f.part = part || 'hide';
+  }
+  function beginInputRename(port, backHome) {
+    var idx = (S.c.inputs || []).indexOf(port), t;
+    if (idx < 0) return;
+    if (top().id !== 'editor') openEditor('home');
+    t = top();
+    t.f.zone = 'inputs';
+    t.f.p = idx;
+    t.f.part = 'name';
+    t.renameHome = !!backHome;
+    openInputKeyboard(t);
+    render();
+  }
   function openInputKeyboard(t) {
     var order = inputOrder(t);
     t.renamePort = order[t.f.p];
@@ -834,7 +927,7 @@
     if (key === 'bksp') { t.kbText = (t.kbText || '').slice(0, -1); return; }
     if (key === 'space') { kbInsert(t, ' '); return; }
     if (key === 'done') { commitInputRename(t); return; }
-    if (key === 'cancel') { closeInputKeyboard(t, 'rename'); return; }
+    if (key === 'cancel') { closeInputKeyboard(t, 'hide'); return; }
     kbInsert(t, kbLabel(t, key));
   }
   function kbPanelHtml(t) {
@@ -901,7 +994,7 @@
         else if (k === 'up' && t.kb.r > 0) { t.kb.r--; t.kb.c = Math.min(t.kb.c, rows[t.kb.r].length - 1); }
         else if (k === 'down' && t.kb.r < rows.length - 1) { t.kb.r++; t.kb.c = Math.min(t.kb.c, rows[t.kb.r].length - 1); }
         else if (k === 'ok') kbActivate(t);
-        else if (k === 'back') closeInputKeyboard(t, 'rename');
+        else if (k === 'back') closeInputKeyboard(t, 'hide');
         return;
       }
       if (t.lifted && t.lifted.kind === 'input') {
@@ -937,12 +1030,12 @@
       } else if (f.zone === 'inputs') {
         if (k === 'up') { if (f.p > 0) f.p--; else if (nh) { f.zone = 'home'; f.i = nh - 1; f.part = 'name'; } else f.zone = 'head'; }
         else if (k === 'down') { if (f.p < ni - 1) f.p++; }
-        else if (k === 'right') { if (f.part === 'name') f.part = 'rename'; else if (no) returnOther(t); }
-        else if (k === 'left') { if (f.part === 'rename') f.part = 'name'; }
+        else if (k === 'right') { if (f.part === 'name') f.part = 'hide'; else if (no) returnOther(t); }
+        else if (k === 'left') { if (f.part === 'hide') f.part = 'name'; }
         else if (k === 'ok') {
           begin();
           if (f.part === 'name') t.lifted = { kind: 'input', port: P[f.p], from: f.p, order: P.slice() };
-          else openInputKeyboard(t);
+          else toggleInputHidden(P[f.p]);
         }
       } else {
         if (k === 'up') { if (f.j > 0) { f.j--; rememberOther(t); } else f.zone = 'head'; }
@@ -956,7 +1049,7 @@
       if (t.lifted && t.lifted.kind === 'input') { if (z === 'iname' && i === t.f.p) this.key(t, 'ok'); return; }
       if (t.lifted) { if (z === 'name' && i === t.f.i) this.key(t, 'ok'); return; }
       if (z === 'name' || z === 'remove') { t.f.zone = 'home'; t.f.i = i; t.f.part = z; }
-      else if (z === 'iname' || z === 'irename') { t.f.zone = 'inputs'; t.f.p = i; t.f.part = z === 'iname' ? 'name' : 'rename'; }
+      else if (z === 'iname' || z === 'ihide') { t.f.zone = 'inputs'; t.f.p = i; t.f.part = z === 'iname' ? 'name' : 'hide'; }
       else if (z === 'other') { t.f.zone = 'other'; t.f.j = i; rememberOther(t); }
       else if (z === 'head') { t.f.zone = 'head'; t.f.h = i; }
       else return;
@@ -999,6 +1092,27 @@
     if (!writeInputState(order, null, 'Reorder inputs')) return;
     t.lifted = null;
     S.note = inputLabel(L.port) + ' moved to position ' + (t.f.p + 1) + '.';
+  }
+  function toggleInputHidden(port) {
+    var hidden = cleanInputHidden(S.c.inputHidden), at = hidden.indexOf(port), c;
+    if (at >= 0) hidden.splice(at, 1);
+    else hidden.push(port);
+    c = next(S.c.home.slice(), S.c.recent.slice());
+    c.inputHidden = hidden;
+    if (!write(c, (at >= 0 ? 'Show ' : 'Hide ') + inputLabel(port))) return false;
+    S.note = inputLabel(port) + (at >= 0 ? ' is on the row again.' : ' is hidden. Its port and name are kept.');
+    return true;
+  }
+  function setInputIcon(port, value) {
+    var icons, c;
+    if (INPUT_ICON_CHOICES.indexOf(value) < 0) return false;
+    icons = cleanInputIcons(S.c.inputIcons);
+    if (value === 'auto') delete icons[String(port)];
+    else icons[String(port)] = value;
+    c = next(S.c.home.slice(), S.c.recent.slice());
+    c.inputIcons = icons;
+    if ((inputIconChoice(port) === value) || (value === 'auto' && inputIconChoice(port) === 'auto')) return true;
+    return write(c, 'Input icon ' + inputLabel(port));
   }
 
   /* ---------- Settings, Layout and messages ---------- */
@@ -1051,8 +1165,15 @@
       { id: 'layout', title: 'Layout', horizontal: true, items: options('layout', ['list', 'dock']) },
       { id: 'apps', title: 'App display', horizontal: true, items: options('apps', ['text', 'icons', 'both']) },
       { id: 'controls', title: 'Home controls', horizontal: true, items: options('controls', ['text', 'icons', 'both']) },
-      { id: 'shelf', title: 'Dock background', horizontal: true, items: options('shelf', ['glass', 'clear']) }
-    ];
+      { id: 'shelf', title: 'Dock background', horizontal: true, items: options('shelf', ['glass', 'clear']) },
+      { id: 'inputStyle', title: 'Input display', horizontal: true, items: options('inputStyle', ['text', 'icons', 'both']) }
+    ].concat((S.c.inputs || INPUT_PORTS).map(function (port) {
+      return { id: 'inputicon-' + port, title: '', caption: inputLabel(port), compact: true, horizontal: true, items: INPUT_ICON_CHOICES.map(function (value) {
+        var label = value === 'xbox360' ? '360' : value === 'auto' ? 'Auto' : value === 'hdmi' ? 'HDMI' : value === 'switch' ? 'Switch' : value === 'xbox' ? 'Xbox' : 'Kodi';
+        var full = value === 'xbox360' ? 'Xbox 360' : value === 'switch' ? 'Nintendo Switch' : label;
+        return { action: 'inputicon.' + port + '.' + value, label: label, applied: inputIconChoice(port) === value, aria: inputLabel(port) + ' ' + full };
+      }) };
+    }));
     if (t.group === 'typography') return [{ id: 'font', title: '', items: options('font', LOOK_VALUES.font) }];
     if (t.group === 'focus') return [
       { id: 'focus', title: 'Focus style', horizontal: true, items: options('focus', ['type', 'glass']) },
@@ -1115,7 +1236,8 @@
       if (error && error.patch[error.row] !== undefined) detailFocus(t, choice(error.row, error.patch[error.row]), 0);
       if (error && error.row === 'mode') applyRotation(error.patch.mode);
       else if (error) setLook(error.patch, { row: error.row });
-    } else if (item.axis === 'mode') applyRotation(item.value);
+    }     else if (item.action.indexOf('inputicon.') === 0) { var iconBits = item.action.split('.'); setInputIcon(Number(iconBits[1]), iconBits[2]); }
+    else if (item.axis === 'mode') applyRotation(item.value);
     else if (item.axis) { patch[item.axis] = item.value; setLook(patch, { row: item.axis }); }
     else if (item.action === 'background.wallpaper') openWallpaper();
     else if (item.action === 'background.rotation') openAppearance('rotation');
@@ -1231,7 +1353,7 @@
   function render() {
     var t = top(), sheet = !!V[t.id].sheet, shown = wall(S.shown ? S.shown.wall : S.c.wall), palette = ADAPTIVE_INK[shown.id];
     var adaptive = applyAdaptiveInk(palette), tr = adaptive && palette.tr ? palette.tr.pol : shown.ut.tr, br = adaptive && palette.br ? palette.br.pol : shown.ut.br;
-    stage.className = 'stage bg-' + S.c.bg + ' l-' + S.c.layout + ' v-' + S.variant + ' m-' + (materialApplies() ? S.c.material : 'none') + ' f-' + S.c.focus + ' a-' + S.c.apps + ' u-' + S.c.controls + ' g-' + S.geom + ' tone-' + shown.tone + ' tr-' + tr + ' br-' + br + wallClasses(shown) + inkRungClasses(palette, adaptive) + ' at-' + t.id + ' font-' + homeFont() + (homeFont() !== 'manrope' ? ' font-custom' : '') + (S.fontSwitch ? ' is-font-switch' : '') + (adaptive ? ' has-adaptive-ink adaptive-tl-' + palette.tl.pol : '') + (!adaptive && shown.clockInk ? ' has-clock-ink' : '') + (!adaptive && shown.dockClockInk ? ' has-dock-clock-ink' : '') + (registeredMaterial(shown.id) ? ' registered-material' : '') + (sheet ? ' is-sheet' : '') + (S.reflow ? ' is-reflow' : '');
+    stage.className = 'stage bg-' + S.c.bg + ' l-' + S.c.layout + ' v-' + S.variant + ' m-' + (materialApplies() ? S.c.material : 'none') + ' f-' + S.c.focus + ' a-' + S.c.apps + ' u-' + S.c.controls + ' i-' + (S.c.inputStyle || 'both') + ' g-' + S.geom + ' tone-' + shown.tone + ' tr-' + tr + ' br-' + br + wallClasses(shown) + inkRungClasses(palette, adaptive) + ' at-' + t.id + ' font-' + homeFont() + (homeFont() !== 'manrope' ? ' font-custom' : '') + (S.fontSwitch ? ' is-font-switch' : '') + (adaptive ? ' has-adaptive-ink adaptive-tl-' + palette.tl.pol : '') + (!adaptive && shown.clockInk ? ' has-clock-ink' : '') + (!adaptive && shown.dockClockInk ? ' has-dock-clock-ink' : '') + (registeredMaterial(shown.id) ? ' registered-material' : '') + (sheet ? ' is-sheet' : '') + (S.reflow ? ' is-reflow' : '');
     if (!adaptive && shown.clockInk) stage.style.setProperty('--clock-ink', shown.clockInk);
     else stage.style.removeProperty('--clock-ink');
     if (!adaptive && shown.dockClockInk) stage.style.setProperty('--dock-clock-ink', shown.dockClockInk);
@@ -1259,17 +1381,25 @@
     return hs;
   }
 
+  function inputTileInner(port) {
+    var style = S.c.inputStyle || 'both', icon = resolvedInputIcon(port), branded = icon !== 'hdmi';
+    var showIcon = style !== 'text', showLabel = style !== 'icons' || !branded, html = '';
+    if (showIcon) html += '<img class="input-glyph" alt="" src="' + ICONS + 'inputs/' + icon + '.svg">';
+    if (showLabel) html += '<span class="input-name">' + esc(inputLabel(port)) + '</span>';
+    return html;
+  }
   function renderInputRow(t) {
-    var ports = S.c.inputs || [], focus = t.id === 'home' && t.f.zone === 'inports', list = S.c.layout === 'list';
+    var ports = visibleInputs(), focus = t.id === 'home' && t.f.zone === 'inports', list = S.c.layout === 'list';
     var tileW = list ? 176 : 220, tileH = list ? 64 : 88, gap = 16, pitch = tileW + gap, html = '';
     var total = ports.length ? (ports.length - 1) * pitch + tileW : 0;
     var origin = list ? 140 : Math.round((1920 - total) / 2), top = list ? 76 : dockGeom(Math.max(1, S.c.home.length || 1)).y - tileH - 20;
-    inputRow.className = 'input-row' + (list ? ' is-list' : '');
+    if (t.id === 'home' && t.f.zone === 'inports' && !ports.length) t.f.zone = 'apps';
+    inputRow.className = 'input-row' + (list ? ' is-list' : '') + (ports.length ? '' : ' is-empty');
     inputRow.style.top = top + 'px';
     inputRow.style.height = tileH + 'px';
     ports.forEach(function (port, i) {
       var on = focus && (t.f.p || 0) === i, label = inputLabel(port);
-      html += '<button type="button" tabindex="-1" class="input-tile' + (on ? ' is-focus' : '') + '" style="width:' + tileW + 'px;height:' + tileH + 'px;transform:translate3d(' + (origin + i * pitch) + 'px,0,0)" data-z="inport" data-i="' + i + '" data-action="home.input.' + port + '" aria-label="' + esc(label) + '"><span>' + esc(label) + '</span></button>';
+      html += '<button type="button" tabindex="-1" class="input-tile' + (on ? ' is-focus' : '') + '" style="width:' + tileW + 'px;height:' + tileH + 'px;transform:translate3d(' + (origin + i * pitch) + 'px,0,0)" data-z="inport" data-i="' + i + '" data-action="home.input.' + port + '" aria-label="' + esc(label) + '">' + inputTileInner(port) + '</button>';
     });
     setHTML(inputRow, html);
   }
@@ -1614,20 +1744,23 @@
     appearanceEl.className = 'appearance detail-' + t.group;
     appearanceRows.className = 'appearance-rows';
     appearanceTitle.textContent = DETAIL_NAMES[t.group];
-    var at = detailLocation(t), selected = at.item, error = S.lookError, status = '', hint;
+    var error = S.lookError, status = '';
     function command(item, inner, cls) {
-      var applied = item.axis && S.c[item.axis] === item.value;
+      var hasApplied = Object.prototype.hasOwnProperty.call(item, 'applied');
+      var applied = hasApplied ? !!item.applied : !!(item.axis && S.c[item.axis] === item.value);
       var loading = !!(item.axis && S.pending && S.pending.target[item.axis] === item.value && S.pending.row === item.axis);
+      var choiceName = item.aria || (item.axis && item.value === 'both' ? 'Icons and text' : item.label);
       return '<button type="button" tabindex="-1" class="setting-choice' + (cls ? ' ' + cls : '') + (t.f.action === item.action ? ' is-focus' : '') + (item.disabled ? ' is-disabled' : '') + (applied ? ' is-applied' : '') + (loading ? ' is-loading' : '') + '"'
-        + (item.axis ? ' role="radio" aria-checked="' + !!applied + '"' : '') + ' aria-label="' + esc(item.axis && item.value === 'both' ? 'Icons and text' : item.label) + '" aria-disabled="' + !!item.disabled + '" aria-busy="' + loading + '"'
+        + ((item.axis || hasApplied) ? ' role="radio" aria-checked="' + applied + '"' : '') + ' aria-label="' + esc(choiceName) + '" aria-disabled="' + !!item.disabled + '" aria-busy="' + loading + '"'
         + ' data-z="detail" data-i="0" data-id="' + item.action + '" data-action="' + item.action + '">' + inner
         + (item.axis ? '<span class="setting-tick" aria-hidden="true">' + (applied ? icon('check') : '') + '</span>' : '') + '</button>';
     }
     setHTML(appearanceBack, command({ action: 'settings.back', label: t.group === 'rotation' ? 'Background' : t.group === 'inputs' ? 'Samsung' : 'Settings' }, icon('left') + '<span>' + (t.group === 'rotation' ? 'Background' : t.group === 'inputs' ? 'Samsung' : 'Settings') + '</span>', 'setting-back'));
     setHTML(appearanceRows, detailSections(t).map(function (section) {
-      return '<section class="setting-section' + (section.horizontal ? ' is-horizontal' : '') + ' section-' + section.id + '">'
+      return '<section class="setting-section' + (section.horizontal ? ' is-horizontal' : '') + (section.compact ? ' is-compact' : '') + ' section-' + section.id + '">'
         + (section.title ? '<h3 class="setting-label" id="setting-' + section.id + '">' + section.title + '</h3>' : '')
-        + '<div class="setting-options"' + (section.items[0].axis ? ' role="radiogroup" aria-label="' + esc(section.title || LOOK_NAMES[section.id] || DETAIL_NAMES[t.group]) + '"' : '') + '>'
+        + '<div class="setting-options"' + ((section.items[0].axis || section.compact) ? ' role="radiogroup" aria-label="' + esc(section.caption || section.title || LOOK_NAMES[section.id] || DETAIL_NAMES[t.group]) + '"' : '') + '>'
+        + (section.caption ? '<span class="input-icon-name">' + esc(section.caption) + '</span>' : '')
         + section.items.map(function (item) {
           var swatch = item.axis === 'bg', body = '';
           if (swatch || item.thumbnail) body += item.value === 'light' || item.value === 'dark'
@@ -1646,8 +1779,7 @@
         + command({ action: 'settings.retry', label: 'Try again' }, '<span>Try again</span>', 'setting-retry');
     }
     setHTML(appearanceStatus, status);
-    hint = selected.disabled ? '' : selected.action === 'settings.back' ? 'Return to ' + (t.group === 'rotation' ? 'Background' : t.group === 'inputs' ? 'Samsung' : 'Settings') : selected.action === 'settings.retry' ? 'Retry this change' : selected.axis ? 'Apply selected setting' : selected.action === 'background.wallpaper' ? 'Choose a wallpaper' : selected.action === 'background.rotation' ? 'Choose a rotation interval' : 'Open on the TV';
-    setHTML(appearanceDesc, hint ? '<span class="remote-key">OK</span><span>' + esc(hint) + '</span>' : '');
+    setHTML(appearanceDesc, '');
   }
   function renderWallpaper(t) {
     V.wallpaper.norm(t);
@@ -1656,7 +1788,7 @@
     appearanceRows.className = 'appearance-rows wallpaper-picker';
     setHTML(appearanceBack, '<button type="button" tabindex="-1" class="setting-choice setting-back' + (t.f.zone === 'back' ? ' is-focus' : '') + '" data-z="wall-back" data-action="wallpaper.back">' + icon('left') + '<span>Background</span></button>');
     setHTML(appearanceRows, '<div class="wallpaper-edge wallpaper-before" aria-hidden="true">' + icon('up') + '</div><div class="wallpaper-list" role="radiogroup" aria-label="Wallpaper"><div class="wallpaper-rows"></div></div><div class="wallpaper-edge wallpaper-after" aria-hidden="true">' + icon('down') + '</div>');
-    var rows = appearanceRows.querySelector('.wallpaper-rows'), shown = wall(S.wallShown) || wall(S.c.wall), candidate = WALLS[t.i], status, note, hint;
+    var rows = appearanceRows.querySelector('.wallpaper-rows'), shown = wall(S.wallShown) || wall(S.c.wall), candidate = WALLS[t.i], status, note;
     keyed(rows, WALLS.map(function (w) { return { key: w.id, wall: w }; }), function (row, item, i) {
       var visible = i >= t.top && i < t.top + WALL_VISIBLE, w = item.wall, image;
       setContent(row, w.id + '|' + visible, function () { return '<span class="wallpaper-thumb">' + (visible ? '<img src="' + WP + w.id + '-thumb.jpg" alt="">' : '') + '</span><span class="setting-copy"><span class="setting-name">' + esc(w.name) + '</span></span><span class="setting-tick" aria-hidden="true"></span>'; });
@@ -1682,9 +1814,7 @@
     status = '<p class="wallpaper-preview-name"><span>' + esc(shown.name) + '</span><span class="wallpaper-count">' + (wallIndex(shown.id) + 1) + ' of ' + WALLS.length + '</span></p><p class="wallpaper-preview-state' + (t.failedId ? ' setting-error' : '') + '">' + esc(note) + '</p>';
     if (t.failedId) status += '<button type="button" tabindex="-1" class="setting-choice setting-retry' + (t.f.zone === 'retry' ? ' is-focus' : '') + '" data-z="wall-retry" data-action="wallpaper.retry">Try again</button>';
     setHTML(appearanceStatus, status);
-    hint = t.f.zone === 'back' ? 'Return to Background' : t.f.zone === 'retry' ? 'Retry this photo' : 'Apply selected photo';
-    if (t.f.zone === 'photo' && candidate.id === S.c.wall && !S.pending && !t.failedId) hint = '';
-    setHTML(appearanceDesc, hint ? '<span class="remote-key">OK</span><span>' + hint + '</span>' : '');
+    setHTML(appearanceDesc, '');
   }
   /* Keep the retry or membership state on the focused control. The stage-level line
      shares its position without changing the control's identity or key behaviour. */
@@ -1742,7 +1872,7 @@
         + '<div class="row-cue editor-before" data-slot="otherBefore" aria-hidden="true">' + icon('up') + '</div><div class="row-cue editor-after" data-slot="otherAfter" aria-hidden="true">' + icon('down') + '</div>'
         + '<div class="row-cue home-before" data-slot="homeBefore" aria-hidden="true">' + icon('up') + '</div><div class="row-cue home-after" data-slot="homeAfter" aria-hidden="true">' + icon('down') + '</div>';
     },
-    settings: function () { return '<h2 class="s-title">Settings</h2><div class="settings-overview" data-slot="list"></div><p class="settings-overview-hint"><span class="remote-key">OK</span><span>Open selected group</span></p>'; },
+    settings: function () { return '<h2 class="s-title">Settings</h2><div class="settings-overview" data-slot="list"></div>'; },
     message: function (t) {
       var m = messageContent(t);
       return '<h2 class="msg-title">' + esc(m.title) + '</h2><p class="msg-line">' + esc(m.line) + '</p><p class="msg-note">' + esc(m.note) + '</p><div class="msg-acts" data-slot="acts"></div>';
@@ -1812,16 +1942,16 @@
         }
         if (it.port) {
           pi = ports.indexOf(it.port); here = f.zone === 'inputs' && pi === f.p; lifted = !!(t.lifted && t.lifted.kind === 'input' && pi === f.p);
-          setContent(row, 'in|' + it.port + '|' + inputLabel(it.port), function () { return '<div class="er-name" role="button"><span class="panel-content"><span class="er-num"></span><span class="er-text">' + esc(inputLabel(it.port)) + '</span><span class="er-move">' + icon('updown') + '</span></span></div><div class="er-rm" role="button"><span>Rename</span></div>'; });
-          row.className = 'er' + (here ? ' is-active' : '') + (lifted ? ' is-lifted' : '');
+          setContent(row, 'in|' + it.port + '|' + inputLabel(it.port) + '|' + resolvedInputIcon(it.port), function () { return '<div class="er-name" role="button"><span class="panel-content"><span class="er-num"></span><img class="input-glyph" alt="" src="' + ICONS + 'inputs/' + resolvedInputIcon(it.port) + '.svg"><span class="er-text">' + esc(inputLabel(it.port)) + '</span><span class="er-move">' + icon('updown') + '</span></span></div><div class="er-rm" role="button"><span></span></div>'; });
+          row.className = 'er' + (here ? ' is-active' : '') + (lifted ? ' is-lifted' : '') + (isInputHidden(it.port) ? ' is-hidden' : '');
           row.style.transform = 'translate3d(' + (lifted ? 16 : 0) + 'px,' + (editorInputOrigin(H.length) + ED_SEP + pi * ED_ROW) + 'px,0)';
           row.querySelector('.er-num').textContent = String(pi + 1);
           row.firstChild.className = 'er-name' + (here && (f.part === 'name' || lifted) ? ' is-focus' : '');
           row.firstChild.setAttribute('aria-label', inputLabel(it.port));
-          row.lastChild.className = 'er-rm' + (here && f.part === 'rename' && !lifted ? ' is-focus' : '');
-          row.lastChild.firstChild.textContent = 'Rename';
+          row.lastChild.className = 'er-rm' + (here && f.part === 'hide' && !lifted ? ' is-focus' : '');
+          row.lastChild.firstChild.textContent = isInputHidden(it.port) ? 'Show' : 'Hide';
           attrs(row.firstChild, 'iname', pi, 'editor.input.move.' + it.port);
-          attrs(row.lastChild, 'irename', pi, 'editor.input.rename.' + it.port);
+          attrs(row.lastChild, 'ihide', pi, 'editor.input.hide.' + it.port);
           return;
         }
         i = H.indexOf(it.id); a = app(it.id); here = f.zone === 'home' && i === f.i; lifted = !!(t.lifted && t.lifted.kind !== 'input' && i === f.i);
@@ -2106,14 +2236,45 @@
   });
   stage.addEventListener('click', function (ev) {
     var el = ev.target;
+    if (suppressInputClick) { suppressInputClick = false; focusStage(); return; }
     while (el && el !== stage && !(el.getAttribute && el.getAttribute('data-z'))) el = el.parentNode;
     focusStage();
     if (!el || el === stage) return;
     pointAt(el);
   });
-  var heldKeys = {};
+  var heldKeys = {}, inputHold = null, suppressInputClick = false;
+  function clearInputHold() {
+    if (!inputHold) return;
+    clearTimeout(inputHold.timer);
+    inputHold = null;
+  }
+  function inputHoldFromKey() {
+    var t = top(), ports;
+    if (!t || t.renaming) return null;
+    if (t.id === 'home' && t.f.zone === 'inports') {
+      ports = visibleInputs();
+      return ports.length ? { port: ports[clamp(t.f.p || 0, 0, ports.length - 1)], origin: 'home' } : null;
+    }
+    if (t.id === 'editor' && t.f.zone === 'inputs' && t.f.part === 'name' && !t.lifted) {
+      ports = inputOrder(t);
+      return ports.length ? { port: ports[t.f.p], origin: 'editor' } : null;
+    }
+    return null;
+  }
+  function armInputHold(target, via) {
+    clearInputHold();
+    inputHold = { port: target.port, origin: target.origin, via: via, fired: false, timer: setTimeout(function () {
+      if (!inputHold || inputHold.fired) return;
+      inputHold.fired = true;
+      beginInputRename(inputHold.port, inputHold.origin === 'home');
+    }, INPUT_HOLD_MS) };
+  }
+  function actionEl(node) {
+    while (node && node !== stage && !(node.getAttribute && node.getAttribute('data-z'))) node = node.parentNode;
+    return node && node !== stage ? node : null;
+  }
   document.addEventListener('keydown', function (ev) {
-    var code = ev.keyCode, k = KEYS[code], typing = top(), ch;
+    var code = ev.keyCode, k = KEYS[code], typing = top(), ch, target;
     if (typing && typing.id === 'editor' && typing.renaming) {
       if (code === 8) { ev.preventDefault(); typing.kbText = (typing.kbText || '').slice(0, -1); render(); return; }
       ch = ev.key;
@@ -2122,14 +2283,51 @@
     if (code === 9) { ev.preventDefault(); return; }
     if (!k || ev.metaKey || ev.ctrlKey || ev.altKey) return;
     ev.preventDefault();
+    if (k === 'ok' && !ev.repeat) {
+      target = inputHoldFromKey();
+      if (target) { heldKeys[code] = true; armInputHold(target, 'key'); return; }
+    }
     if (k === 'ok' || k === 'back') { if (ev.repeat || heldKeys[code]) return; heldKeys[code] = true; }
     press(k);
   });
-  document.addEventListener('keyup', function (ev) { delete heldKeys[ev.keyCode]; });
-  window.addEventListener('blur', function () { heldKeys = {}; });
+  document.addEventListener('keyup', function (ev) {
+    var code = ev.keyCode, hold = inputHold;
+    if ((code === 13) && hold && hold.via === 'key') {
+      clearInputHold();
+      if (!hold.fired) {
+        if (hold.origin === 'home' && top().id === 'home' && top().f.zone === 'inports') perform(inputLabel(hold.port), function (done) { FrameDevice.setSource(hold.port, done); });
+        else if (hold.origin === 'editor' && top().id === 'editor' && !top().renaming && !top().lifted && top().f.part === 'name') press('ok');
+      }
+    }
+    delete heldKeys[code];
+  });
+  stage.addEventListener('pointerdown', function (ev) {
+    var el, t, port, ports;
+    if (ev.button && ev.button !== 0) return;
+    el = actionEl(ev.target);
+    if (!el) return;
+    t = top();
+    if (el.getAttribute('data-z') === 'inport' && t.id === 'home') {
+      ports = visibleInputs();
+      port = ports[+el.getAttribute('data-i')];
+      if (port) armInputHold({ port: port, origin: 'home' }, 'pointer');
+    } else if (el.getAttribute('data-z') === 'iname' && t.id === 'editor' && !t.lifted && !t.renaming) {
+      ports = inputOrder(t);
+      port = ports[+el.getAttribute('data-i')];
+      if (port) armInputHold({ port: port, origin: 'editor' }, 'pointer');
+    }
+  });
+  stage.addEventListener('pointerup', function () {
+    if (!inputHold || inputHold.via !== 'pointer') return;
+    if (inputHold.fired) suppressInputClick = true;
+    clearInputHold();
+  });
+  stage.addEventListener('pointercancel', function () { if (inputHold && inputHold.via === 'pointer') clearInputHold(); });
+  window.addEventListener('blur', function () { heldKeys = {}; clearInputHold(); });
   window.addEventListener('focus', function () { FrameDevice.cancelSource(); release(); refreshInputsOnReturn(); focusStage(); after(); updateClock(); });
   document.addEventListener('visibilitychange', function () {
     heldKeys = {};
+    clearInputHold();
     if (document.hidden) { FrameDevice.cancelSource(); pauseRotation(); clearTimeout(clockTimer); }
     else {
       release();

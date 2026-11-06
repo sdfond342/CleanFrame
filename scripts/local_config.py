@@ -67,7 +67,8 @@ def load_settings(root=ROOT):
             config = json.loads(path.read_text())
         except (ValueError, OSError):
             raise ValueError('Cannot read .local/signing.json as JSON.') from None
-    allowed = {'sdk_path', 'profile', 'password_file', 'package_id', 'app_id'}
+    allowed = {'sdk_path', 'profile', 'password_file', 'package_id', 'app_id',
+               'profiles_path', 'author_certificate', 'distributor_certificate', 'identity_evidence'}
     if not isinstance(config, dict) or set(config) - allowed:
         raise ValueError('Unknown signing setting. See signing.example.json; do not put passwords in JSON.')
     if path.exists() and 'profile' not in config:
@@ -84,9 +85,18 @@ def load_settings(root=ROOT):
     legacy_password = root / '.local/certificates/private/certificate-password.txt'
     # Only an absent config enables the original maintainer password-file default.
     password = config.get('password_file') if path.exists() else (str(legacy_password) if legacy_password.exists() else None)
+    def optional_path(key):
+        if key not in config or config[key] is None:
+            return None
+        return local_path(config[key], root)
+
     return {'sdk_path': local_path(config.get('sdk_path', '.local/tizen-sdk'), root).resolve(),
             'profile': profile, 'identity': identity,
-            'password_file': local_path(password, root) if password is not None else None}
+            'password_file': local_path(password, root) if password is not None else None,
+            'profiles_path': optional_path('profiles_path'),
+            'author_certificate': optional_path('author_certificate'),
+            'distributor_certificate': optional_path('distributor_certificate'),
+            'identity_evidence': optional_path('identity_evidence')}
 
 
 def read_password(path, root=ROOT):

@@ -4,6 +4,7 @@ from pathlib import Path
 import pty
 import select
 import signal
+import sys
 import tempfile
 import termios
 import time
@@ -12,6 +13,7 @@ import zipfile
 from font_assets import write_widget_archive
 from local_config import ROOT, load_settings, read_password
 from private_files import check_signed_widget
+from signing_checks import preflight, verify_signatures
 
 
 def sign(command, password=None, timeout=60):
@@ -81,8 +83,20 @@ def sign(command, password=None, timeout=60):
     return os.waitstatus_to_exitcode(status)
 
 
-def main(root=ROOT):
+def main(root=ROOT, argv=None):
+    if argv is None:
+        argv = []
     settings = load_settings(root)
+    if argv[:1] == ['--verify']:
+        if len(argv) != 2:
+            raise ValueError('Use --verify with the signed widget path.')
+        for line in verify_signatures(argv[1], settings['identity'], require_own=True):
+            print(line)
+        return
+    if argv:
+        raise ValueError('Unknown packaging argument.')
+    for line in preflight(settings, root):
+        print(line)
     cli = settings['sdk_path'] / 'tools/ide/bin/tizen'
     if not cli.is_file() or not os.access(cli, os.X_OK):
         raise ValueError('Tizen CLI missing. Set sdk_path in .local/signing.json; see docs/development.md.')
@@ -108,7 +122,7 @@ def main(root=ROOT):
 
 if __name__ == '__main__':
     try:
-        main()
+        main(argv=sys.argv[1:])
     except (ValueError, OSError, zipfile.BadZipFile, termios.error) as error:
         # Known validation messages contain no credentials. Suppress SDK/OS payloads.
         message = str(error) if isinstance(error, ValueError) else 'Cannot complete packaging. Check SDK/profile setup and local file permissions.'

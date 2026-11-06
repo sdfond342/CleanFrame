@@ -192,10 +192,28 @@ def preflight(settings, root, platform=None):
     return lines
 
 
+def runtime_identity_bytes(data, identity):
+    """Point generated runtime files at the selected application id. Leave source bytes unchanged."""
+    if identity['package_id'] == REFERENCE_PACKAGE and identity['app_id'] == REFERENCE_APP:
+        return data
+    return data.replace(REFERENCE_APP.encode(), identity['app_id'].encode())
+
+
+def assert_no_reference_identity(path, identity):
+    if identity['package_id'] == REFERENCE_PACKAGE or identity['app_id'] == REFERENCE_APP:
+        return
+    needle = REFERENCE_PACKAGE.encode()
+    with zipfile.ZipFile(path) as archive:
+        for info in archive.infolist():
+            if needle in archive.read(info.filename):
+                raise ValueError('Generated package still contains the reference identity in ' + info.filename)
+
+
 def verify_signatures(path, identity, require_own=False):
-    """Report file and certificate presence. This does not prove a signature is valid."""
+    """Report file and certificate presence. This does not prove a signature or certificate identity."""
     if require_own:
         assert_own_identity(identity)
+        assert_no_reference_identity(path, identity)
     check_signed_widget(path, identity)
     lines = []
     with zipfile.ZipFile(path) as archive:
@@ -217,11 +235,8 @@ def verify_signatures(path, identity, require_own=False):
             lines.append(name + ' file: present')
             lines.append(name + ' signature value: present')
             lines.append(name + ' embedded certificate: present')
-        fallback = False
-        for info in archive.infolist():
-            if info.filename.endswith('.js') and b'nClrkHome1.FrameHome' in archive.read(info.filename):
-                fallback = True
-                break
-        lines.append('Packaged script reference fallback: ' + ('present' if fallback else 'absent'))
+    if require_own:
+        lines.append('Reference runtime identity: absent')
+    lines.append('Certificate presence is not identity proof')
     lines.append('Cryptographic validity: not_checked')
     return lines

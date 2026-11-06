@@ -4,7 +4,7 @@ Use this path for an independent CleanFrame package on Linux, including an Ubunt
 
 The tracked `app/config.xml` keeps the reference installation identity. That guard stays. The widget manifest is the file that receives the SDK-generated identity from ignored `.local/signing.json`.
 
-Samsung documents Tizen Studio for Ubuntu. Use the Ubuntu release listed in the current [Tizen Studio prerequisites](https://docs.tizen.org/application/tizen-studio/setup/prerequisites/). This repository does not select a distro or install a virtual machine. Start the groups below only after `tizen version` prints a version in that machine.
+The guest used for these steps is Ubuntu 22.04.5 LTS, amd64, with 6 GB of RAM, a 60 GB dynamically allocated disk, and a NAT network adapter. It is for packaging and for a physical TV only. Canonical lists standard security maintenance for Ubuntu 22.04 LTS through April 2027. Samsung's TV SDK page does not explicitly certify this guest. Start the groups below only after `tizen version` prints a version in that machine. Do not copy a Windows profile index onto this guest.
 
 ## Group 1 — local configuration
 
@@ -31,17 +31,11 @@ Copy the existing author `.p12` and distributor `.p12` into the virtual machine 
 
 Do not commit the `.p12` files, send them to a chat, or put a password in `signing.json`.
 
-Register those Linux files once, in a terminal on the virtual machine. The [Tizen CLI profile command](https://docs.tizen.org/application/tizen-studio/web-tools/cli/) accepts the existing files. Type the passwords only in that terminal. Do not save the finished command. Omitting the distributor file makes Tizen Studio substitute its built-in distributor certificate, which is a different certificate.
+Register those same two files in Certificate Manager. Create a profile with the existing profile name. On the author step, choose the existing-author-certificate action and select the Linux `author.p12`. On the distributor step, choose the existing-distributor-certificate action and select the Linux `distributor.p12`. Type each password only into Certificate Manager's own fields. Do not choose a create-new action for either certificate.
 
-```sh
-tizen security-profiles add -n YOUR_CERTIFICATE_PROFILE \
-  -a "$HOME/SamsungCertificate/YOUR_CERTIFICATE_PROFILE/author.p12" \
-  -p 'TYPE_THE_AUTHOR_PASSWORD' \
-  -d "$HOME/SamsungCertificate/YOUR_CERTIFICATE_PROFILE/distributor.p12" \
-  -dp 'TYPE_THE_DISTRIBUTOR_PASSWORD'
-```
+Samsung's TV certificate article documents the existing-author choice and then describes creating a distributor certificate. The Certificate Manager distributor step also offers an existing-distributor choice; Samsung documents that choice for the same certificate wizard. Use it. If that choice is not on the screen, stop. Do not create a distributor certificate. The Tizen CLI can point a profile at an existing distributor file, but its documented password options put the password in the process command line, where other local programs can see it. This guide does not include that command.
 
-Expected result: the command writes a Linux profile index. `tizen cli-config -l` shows `default.profiles.path` pointing at that Linux file. Put that file and the two Linux `.p12` paths into `.local/signing.json`. If the active profile name is different, change the active profile in Certificate Manager. The packaging script does not change it and does not run `security-profiles`.
+Expected result: Certificate Manager shows the profile. `tizen cli-config -l` shows `default.profiles.path` pointing at a Linux file. Put that file and the two Linux `.p12` paths into `.local/signing.json`. If a different profile is active, select this profile in Certificate Manager. The packaging script does not change the active profile.
 
 Expected preflight lines after Group 3 starts:
 
@@ -93,13 +87,14 @@ author-signature.xml embedded certificate: present
 signature1.xml file: present
 signature1.xml signature value: present
 signature1.xml embedded certificate: present
-Packaged script reference fallback: present
+Reference runtime identity: absent
+Certificate presence is not identity proof
 Cryptographic validity: not_checked
 ```
 
-`Packaged script reference fallback: present` means `app/device.js` still contains the reference id used when the TV does not report the current application. The installed identity is the manifest above. This script does not rewrite that fallback.
+`Reference runtime identity: absent` means the generated widget, including the fallback in the packaged `device.js`, does not contain the reference application id. The tracked `app/device.js` in the checkout still has that reference fallback. The packager changes only the generated widget.
 
-File names, signature values, and embedded certificates show that the official packager attached its signature files. `Cryptographic validity: not_checked` means this repository did not prove those signatures mathematically. Do not treat presence as validity.
+File names, signature values, and embedded certificates show that the official packager attached its signature files. An embedded certificate does not prove which private key signed the widget. `Cryptographic validity: not_checked` means this repository did not prove those signatures mathematically.
 
 If the packager asks for a password, stop. Prefer the access saved by Certificate Manager. The optional `password_file` in `.local/signing.json` can point at one owner-only password file with mode `600`; both prompts receive that same password. Do not put the password in JSON or in the `tizen` command used by this repository.
 

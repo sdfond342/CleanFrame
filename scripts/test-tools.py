@@ -273,7 +273,7 @@ with zipfile.ZipFile(target, 'a') as archive:
             self.assertEqual(manifest_identity(archive.read('config.xml')), identity)
 
     def test_public_check_reads_index_and_history(self):
-        for name in ['scripts/check-public.py', 'scripts/font_assets.py', 'scripts/local_config.py', 'scripts/private_files.py',
+        for name in ['scripts/check-public.py', 'scripts/font_assets.py', 'scripts/signing_checks.py', 'scripts/local_config.py', 'scripts/private_files.py',
                      'app/assets/fonts/SOURCES.json', 'app/assets/manrope.woff2', 'app/assets/manrope-OFL.txt',
                      'app/assets/fonts/geist/OFL.txt', 'app/assets/fonts/newsreader/OFL.txt']:
             target = self.root / name
@@ -478,6 +478,9 @@ with zipfile.ZipFile(target, 'a') as archive:
                         package_id='AbCdEf1234', app_id='AbCdEf1234.MyHome',
                         identity_evidence=str(self.root / 'app/config.xml'))
             preflight(load_settings(self.root), self.root, platform='posix')
+        tracked_script = (ROOT / 'app/device.js').read_bytes()
+        self.assertIn(b"var SELF = 'nClrkHome1.FrameHome';", tracked_script)
+        (self.root / 'app/device.js').write_bytes(tracked_script)
         cli = self.root / '.local/sdk/tools/ide/bin/tizen'
         cli.parent.mkdir(parents=True)
         marker = outside / 'cli-called'
@@ -507,25 +510,39 @@ with zipfile.ZipFile(target, 'a') as archive:
             self.assertEqual(manifest_identity(archive.read('config.xml')),
                              {'package_id': 'AbCdEf1234', 'app_id': 'AbCdEf1234.MyHome'})
             self.assertNotIn(b'nClrkHome1', archive.read('config.xml'))
+            packaged_script = archive.read('device.js')
+            self.assertIn(b"var SELF = 'AbCdEf1234.MyHome';", packaged_script)
+            self.assertNotIn(b'nClrkHome1', packaged_script)
+        self.assertEqual((self.root / 'app/device.js').read_bytes(), tracked_script)
+        self.assertEqual((ROOT / 'app/device.js').read_bytes(), tracked_script)
         signed = outside / 'presence.wgt'
         signature = (
             '<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">'
             '<SignatureValue>bm90LWEtcmVhbC1zaWduYXR1cmU=</SignatureValue>'
             '<KeyInfo><X509Data><X509Certificate>bm90LWEtcmVhbC1jZXJ0aWZpY2F0ZQ==</X509Certificate></X509Data></KeyInfo>'
             '</Signature>')
+        own_config = evidence.read_bytes().replace(b'2.3', b'5.0')
         with zipfile.ZipFile(signed, 'w') as archive:
-            archive.writestr('config.xml', evidence.read_bytes().replace(b'2.3', b'5.0'))
+            archive.writestr('config.xml', own_config)
             archive.writestr('author-signature.xml', signature)
             archive.writestr('signature1.xml', signature)
             archive.writestr('device.js', b'var SELF = "nClrkHome1.FrameHome";')
+        with self.assertRaisesRegex(ValueError, 'reference identity'):
+            package.main(self.root, ['--verify', str(signed)])
+        with zipfile.ZipFile(signed, 'w') as archive:
+            archive.writestr('config.xml', own_config)
+            archive.writestr('author-signature.xml', signature)
+            archive.writestr('signature1.xml', signature)
+            archive.writestr('device.js', b"var SELF = 'AbCdEf1234.MyHome';")
         with contextlib.redirect_stdout(io.StringIO()) as output:
             package.main(self.root, ['--verify', str(signed)])
         verified = output.getvalue()
         self.assertIn('Manifest package id: AbCdEf1234', verified)
         self.assertIn('Reference manifest identity: no', verified)
+        self.assertIn('Reference runtime identity: absent', verified)
         self.assertIn('author-signature.xml embedded certificate: present', verified)
         self.assertIn('signature1.xml signature value: present', verified)
-        self.assertIn('Packaged script reference fallback: present', verified)
+        self.assertIn('Certificate presence is not identity proof', verified)
         self.assertIn('Cryptographic validity: not_checked', verified)
         self.assertNotIn(secret, verified)
         with zipfile.ZipFile(signed, 'w') as archive:
@@ -537,9 +554,56 @@ with zipfile.ZipFile(target, 'a') as archive:
         script = (ROOT / 'scripts/package-own.sh').read_text()
         self.assertIn('CLEANFRAME_REQUIRE_OWN_IDENTITY=1', script)
         self.assertIn('scripts/package.py --verify', script)
+        windows_script = (ROOT / 'scripts/package-own.ps1').read_text()
         for forbidden in ['native-home', 'sdb', 'vd_appinstall', 'vconf', 'security-profiles', 'Teegen', 'yPoFi7rWAI']:
             self.assertNotIn(forbidden, script)
+            self.assertNotIn(forbidden, windows_script)
             self.assertNotIn(forbidden, (ROOT / 'scripts/signing_checks.py').read_text())
+            self.assertNotIn(forbidden, (ROOT / 'scripts/package.py').read_text())
+
+    def test_generated_package_rejects_leftover_reference_id(self):
+        source_script = (ROOT / 'app/device.js').read_bytes()
+        (self.root / 'app/device.js').write_bytes(source_script)
+        (self.root / 'app/extra.js').write_text('var leftover = "nClrkHome1";\n')
+        identity = {'package_id': 'AbCdEf1234', 'app_id': 'AbCdEf1234.MyHome'}
+        output = self.root / 'leftover.wgt'
+        with self.assertRaisesRegex(ValueError, 'reference identity'):
+            write_widget_archive(output, root=self.root, include_private=False, identity=identity)
+        self.assertFalse(output.exists())
+        self.assertEqual((self.root / 'app/device.js').read_bytes(), source_script)
+        self.assertEqual((ROOT / 'app/device.js').read_bytes(), source_script)
+
+    def test_windows_launcher_keeps_password_off_the_command_line(self):
+        secret = b'synthetic password'
+        argv = [r'C:\tizen-studio\tools\ide\bin\tizen.bat', 'package', '-t', 'wgt', '-s', 'SyntheticTV',
+                '-o', r'C:\out', '--', r'C:\in.wgt']
+        command = package.windows_command_line(argv)
+        self.assertEqual(command[0], 'cmd.exe')
+        self.assertIn('tizen.bat', command[-1])
+        self.assertIn('-s', command[-1])
+        self.assertIn('SyntheticTV', command[-1])
+        self.assertNotIn(secret.decode(), command[-1])
+        cli = self.root / 'fake-tizen'
+        marker = self.root / 'argv.txt'
+        cli.write_text('#!' + sys.executable + '\n' + '''
+import sys
+from pathlib import Path
+Path(''' + repr(str(marker)) + ''').write_text('\\n'.join(sys.argv))
+print('Password:', end='', flush=True)
+if input() != 'synthetic password':
+    sys.exit(2)
+print('No: (N) ?', end='', flush=True)
+if input() != 'n':
+    sys.exit(2)
+''')
+        cli.chmod(0o700)
+        self.assertEqual(package.sign([str(cli), str(marker)], secret, platform='nt'), 0)
+        recorded = marker.read_text()
+        self.assertNotIn(secret.decode(), recorded)
+        self.assertNotIn('password', recorded.lower())
+        cli.write_text('#!' + sys.executable + '\nimport time\ntime.sleep(10)\n')
+        with self.assertRaisesRegex(ValueError, 'timed out'):
+            package.sign([str(cli)], platform='nt', timeout=0.2)
 
 
 if __name__ == '__main__':

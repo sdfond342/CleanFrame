@@ -2,8 +2,8 @@
 
 ## Home
 
-- Dock: Left/Right scrolls the apps without wrapping. Up enters the top-right controls, starting with Art Mode or the last selected control. Left/Right moves between Art Mode, All apps and Settings. Down or Back returns to the selected app. The clock is at the top left.
-- List: Up/Down scrolls the apps without wrapping. Right enters the bottom-right controls, aligned with the clock above. Up/Down moves between Art Mode, All apps and Settings. Left or Back returns to the selected app. The list fades at both ends as it scrolls.
+- Dock: Left/Right scrolls the apps without wrapping. Up enters the top-right controls, starting with All apps or the last selected control. Left/Right moves between All apps and Settings. Down enters the separate HDMI row. Back from the app row opens a choice to stay or open Samsung Home. The clock is at the top left.
+- List: Up/Down scrolls the apps without wrapping. Right enters the bottom-right controls, aligned with the clock above. Up/Down moves between All apps and Settings. Down from the last app enters the separate HDMI row. Left or Back returns to the selected app. The list fades at both ends as it scrolls.
 - OK opens the selected item. Focus alone never launches an app.
 - Icons-only apps and controls reveal their names when focused. App presentation and control presentation are independent.
 - Back from the app list or Dock opens a choice to stay or open Samsung Home.
@@ -54,7 +54,9 @@ Removing the last Home app or adding a tenth app is prevented. A failed storage 
 
 ## Art Mode and Samsung screens
 
-Art Mode sends an application control to the installed `org.tizen.art-app`, with `mode=fullscreen` and `requester=mobile`. This aims to enter native Art Mode with its current artwork, without toggling power or changing the selected artwork.
+This launcher does not show an Art Mode control and does not send an Art Mode command. The television’s own Art Mode, if the set has one, is unchanged.
+
+The previous Frame launcher sent an application control to `org.tizen.art-app`, with `mode=fullscreen` and `requester=mobile`. That control is not offered here.
 
 This mode comes from [research on Samsung's Art app](https://github.com/TheFab21/ha-samsungtv-smart/blob/master/notes/QN55LS03FAFXZA/ART_MODE_DECOMPILED.md), on another Tizen 9 Frame model. It is an internal Samsung contract, not a documented public Art API. Its visible behaviour on this exact firmware must be confirmed on the TV.
 
@@ -66,7 +68,7 @@ Installed-app discovery allows up to 20 seconds for large TV catalogues; launch 
 
 ## HDMI inputs
 
-Settings → Samsung → Inputs opens the HDMI chooser. The adapter reads the TV’s actual connected and disconnected source records, including sleeping devices that may be listed as disconnected. It does not guess a universal port count or add a fourth default Home control. Missing APIs, denied access and discovery failure produce an unavailable/error state rather than invented ports. The active source comes from the synchronous `tvwindow.getSource()` return value.
+The launcher has its own HDMI row, separate from the app row. Its initial launcher labels are HDMI1, HDMI2, Kodi and HDMI4, for public source numbers 1, 2, 3 and 4. Those labels are stored with the launcher and do not rename the television source. Settings → Input row reorders and renames them. OK on a home-row chip asks the public TV window API for that port number only after the TV reports it; a missing port stays an error. Settings → Samsung → Inputs still reads the live connected and disconnected records, including sleeping devices that may be listed as disconnected. It does not invent ports beyond what the TV returns. Missing APIs, denied access and discovery failure produce an unavailable/error state. The active source comes from the synchronous `tvwindow.getSource()` return value. Switching on this set still needs a device test.
 
 Up/Down selects an input. OK requests that exact source; Back returns to Samsung Settings. Retry after a failed load rereads the available sources. A routing error remains an error, and a failed handoff leaves the launcher usable. Timed-out or cancelled requests cannot start a later routing or viewer action; a native request already sent to the TV may itself be uncancellable.
 

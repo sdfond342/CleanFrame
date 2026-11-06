@@ -45,10 +45,10 @@ Expected result: `git status` does not list `.local/signing.json`.
 From the repository root:
 
 ```text
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\package-own.ps1
+powershell -NoProfile -File scripts\package-own.ps1
 ```
 
-`-ExecutionPolicy Bypass` applies only to that process. It does not change the machine policy.
+This does not change the execution policy. If Windows blocks that one downloaded script, `Unblock-File .\scripts\package-own.ps1` clears the block on that file only.
 
 The script calls:
 

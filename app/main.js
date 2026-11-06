@@ -47,12 +47,12 @@
   var LOOK_VALUES = { bg: ['dark', 'light', 'photo'], layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], font: Object.keys(FONTS).filter(function (id) { return id === 'manrope' || PRIVATE_FONTS.indexOf(id) >= 0; }), controls: ['icons', 'both', 'text'], focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'] };
   var LOOK_NAMES = { bg: 'Background', layout: 'Layout', apps: 'Apps', font: 'Font', controls: 'Home controls', focus: 'Focus', material: 'Material' };
   var VALUE_NAMES = { dark: 'Dark', light: 'Light', photo: 'Photo', list: 'List', dock: 'Dock', type: 'Type', glass: 'Glass', soft: 'Soft', frost: 'Frost', tint: 'Clear tint', icons: 'Icons', both: 'Icons and text', text: 'Text' };
-  var UTIL = { art: ['Art Mode', 'art'], apps: ['All apps', 'apps'], arrange: ['Arrange', 'arrange'], settings: ['Settings', 'settings'] };
+  var UTIL = { apps: ['All apps', 'apps'], arrange: ['Arrange', 'arrange'], settings: ['Settings', 'settings'] };
+  var INPUT_PORTS = [1, 2, 3, 4];
   var MSG = {
     leave: { title: 'Leave Home?', line: 'Open Samsung Home?', note: '', actions: [['stay', 'Stay'], ['samsung', 'Samsung Home']] }
   };
   var SVG = {
-    art: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="9.8" r="1.5"/><path d="m4.5 17.5 4.5-4.5 3 3 2.5-2.5 5 5"/>',
     apps: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/>',
     arrange: '<path d="M4 8.5h14M15 5.5l3 3-3 3M20 15.5H6M9 12.5l-3 3 3 3"/>',
     settings: '<path d="m9 3-.6 2.4-2 1.2L4 6l-2 3.5L3.8 11v2L2 14.5 4 18l2.4-.6 2 1.2L9 21h6l.6-2.4 2-1.2 2.4.6 2-3.5-1.8-1.5v-2L22 9.5 20 6l-2.4.6-2-1.2L15 3Z"/><circle cx="12" cy="12" r="3.2"/>',
@@ -86,6 +86,46 @@
     return fallback;
   }
   function lookOf(c) { return { bg: c.bg, wall: c.wall, layout: c.layout, apps: c.apps, font: c.font, controls: c.controls, focus: c.focus, material: c.material }; }
+  function defaultInputName(port) {
+    if (port === 1) return 'HDMI1';
+    if (port === 2) return 'HDMI2';
+    if (port === 3) return 'Kodi';
+    if (port === 4) return 'HDMI4';
+    return 'HDMI' + port;
+  }
+  function copyInputNames(names) {
+    var out = {}, key;
+    names = names || {};
+    for (key in names) if (names.hasOwnProperty(key)) out[key] = names[key];
+    return out;
+  }
+  function cleanInputOrder(saved) {
+    var order = [], seen = {}, i, port;
+    if (Array.isArray(saved)) {
+      for (i = 0; i < saved.length; i++) {
+        port = saved[i];
+        if (INPUT_PORTS.indexOf(port) >= 0 && !seen[port]) { seen[port] = true; order.push(port); }
+      }
+    }
+    INPUT_PORTS.forEach(function (item) { if (!seen[item]) order.push(item); });
+    return order;
+  }
+  function cleanInputNames(saved) {
+    var out = {}, i, port, text;
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return out;
+    for (i = 0; i < INPUT_PORTS.length; i++) {
+      port = INPUT_PORTS[i];
+      text = saved[String(port)];
+      if (typeof text !== 'string') continue;
+      text = text.replace(/[\u0000-\u001f]/g, '').trim().slice(0, 24);
+      if (text && text !== defaultInputName(port)) out[String(port)] = text;
+    }
+    return out;
+  }
+  function inputLabel(port, names) {
+    var custom = (names || S.c.inputNames || {})[String(port)];
+    return custom || defaultInputName(port);
+  }
   function materialApplies(c) { c = c || S.c; return c.bg === 'photo' && (c.layout === 'dock' || c.focus === 'glass'); }
 
   /* ---------- Helpers ---------- */
@@ -138,10 +178,12 @@
       + (maskSupport ? '<span class="mk" style="' + st + ';-webkit-mask-image:url(' + ICONS + id + '.svg);mask-image:url(' + ICONS + id + '.svg)"></span>' : '<img alt="" src="' + ICONS + id + '.svg" style="' + st + '">') + '</span>';
   }
   function appMark(a, w, h, size) {
-    if (a.mark && (maskSupport || S.c.bg !== 'light')) return markHtml(a.brand || a.id, w, h, size);
     var words = a.name.split(/\s+/), letters = words[0].charAt(0) + (words.length > 1 ? words[1].charAt(0) : '');
-    return '<span class="mark monogram' + (a.icon ? ' native-icon' : '') + '" style="width:' + w + 'px;height:' + h + 'px;font-size:' + Math.round(size * .65) + 'px"><span>' + esc(letters.toUpperCase()) + '</span>'
+    var monogram = '<span class="mark monogram' + (a.icon ? ' native-icon' : '') + '" style="width:' + w + 'px;height:' + h + 'px;font-size:' + Math.round(size * .65) + 'px"><span>' + esc(letters.toUpperCase()) + '</span>'
       + (a.icon ? '<img alt="" data-native-icon="true" src="' + esc(a.icon) + '">' : '') + '</span>';
+    if (a.icon) return monogram;
+    if (a.mark && (maskSupport || S.c.bg !== 'light')) return markHtml(a.brand || a.id, w, h, size);
+    return monogram;
   }
   function smallMark(a) { return appMark(a, 56, 44, 36); }
   var measureCanvas = document.createElement('canvas'), measureContext = measureCanvas.getContext('2d'), measureSpan = document.createElement('span');
@@ -346,7 +388,8 @@
       focus: pick(modern.focus, LOOK_VALUES.focus, legacyList ? 'type' : 'glass'), material: pick(modern.material, LOOK_VALUES.material, 'soft'),
       font: pick(modern.font, LOOK_VALUES.font, 'manrope'), wall: wall(modern.wall || s.wallpaper) ? modern.wall || s.wallpaper : WALLS[0].id,
       home: h, recent: recent, lastApp: h.indexOf(s.lastApp) >= 0 ? s.lastApp : h[0],
-      mode: pick(s.mode, MODES.map(function (m) { return m.id; }), 'fixed')
+      mode: pick(s.mode, MODES.map(function (m) { return m.id; }), 'fixed'),
+      inputs: cleanInputOrder(s.inputs), inputNames: cleanInputNames(s.inputNames)
     };
   }
   function serialise(c) {
@@ -354,6 +397,8 @@
     Object.keys(c).forEach(function (key) { out[key] = c[key]; });
     out.version = 2; out.look = lookOf(c); out.dock = c.home.slice(); out.wallpaper = c.wall;
     out.theme = c.layout === 'list' ? 'list' : 'shore';
+    out.inputs = (c.inputs || INPUT_PORTS).slice();
+    out.inputNames = copyInputNames(c.inputNames);
     out.appRecords = [];
     c.home.concat(c.recent).forEach(function (key) {
       var a = app(key);
@@ -363,7 +408,7 @@
   }
   function initialise() {
     var saved = load(), initial; S.c = clean(saved); initial = next(S.c.home.slice(), S.c.recent.slice());
-    S.stack = [{ id: 'home', f: { zone: 'apps', u: 0 } }];
+    S.stack = [{ id: 'home', f: { zone: 'apps', u: 0, p: 0 } }];
     S.sel = S.c.lastApp; S.selIdx = S.c.home.indexOf(S.sel);
     if (saved && initial.mode === 'open') initial.wall = WALLS[(wallIndex(initial.wall) + 1) % WALLS.length].id;
     // Keep the old schema keys alongside the builder values for in-place updates.
@@ -371,7 +416,13 @@
   }
   function clearSession() { S.undo = []; S.removedAt = {}; S.note = null; S.err = null; }
   function begin() { S.note = null; }
-  function next(home, recent) { var c = lookOf(S.c); c.home = home; c.recent = recent; c.lastApp = S.c.lastApp; c.mode = S.c.mode; return c; }
+  function next(home, recent) {
+    var c = lookOf(S.c);
+    c.home = home; c.recent = recent; c.lastApp = S.c.lastApp; c.mode = S.c.mode;
+    c.inputs = (S.c.inputs || INPUT_PORTS).slice();
+    c.inputNames = copyInputNames(S.c.inputNames);
+    return c;
+  }
   function snap() { return { home: S.c.home.slice(), recent: S.c.recent.slice() }; }
   function pushRecent(list, id) { return [id].concat(without(list, id)).slice(0, 5); }
   function write(c, label) {
@@ -491,15 +542,14 @@
   }
 
   /* ---------- Navigation targets ---------- */
-  function utils() { return ['art', 'apps', 'settings']; }
+  function utils() { return ['apps', 'settings']; }
   /* prev/next run along the apps; out goes to the controls, inn comes back (or to a per-app action). */
   function axes() {
     var v = S.c.layout === 'list';
     return { prev: v ? 'up' : 'left', next: v ? 'down' : 'right', out: v ? 'right' : 'up', inn: v ? 'left' : 'down' };
   }
   function utilAction(u) {
-    if (u === 'art') perform('Art Mode', FrameDevice.art);
-    else if (u === 'apps') openApps();
+    if (u === 'apps') openApps();
     else openSettings();
   }
   function addAppsRoute() { openEditor('home'); }
@@ -535,6 +585,7 @@
     key: function (t, k) {
       var f = t.f, h = S.c.home, U = utils(), x = axes(), i = ensureSel();
       if (S.c.layout === 'list') { listHomeKey(t, k, i, U); return; }
+      if (f.zone === 'inports') { inputRowKey(t, k); return; }
       if (f.zone === 'util') {
         f.u = clamp(f.u, 0, U.length - 1);
         if (k === x.prev && f.u > 0) f.u--;
@@ -546,6 +597,7 @@
       }
       f.zone = 'apps';
       if (k === x.out) { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
+      else if (k === 'down' && S.c.inputs.length) { f.zone = 'inports'; f.p = clamp(f.p || 0, 0, S.c.inputs.length - 1); }
       else if (k === 'back') openMessage('leave');
       else if (!h.length) { if (k === 'ok') addAppsRoute(); }
       else if (k === x.prev && i > 0) setSel(h[i - 1]);
@@ -555,13 +607,23 @@
     point: function (t, z, i) {
       if (z === 'util') { t.f.zone = 'util'; t.f.u = i; S.lastUtil = i; }
       else if (z === 'app') { t.f.zone = 'apps'; setSel(S.c.home[i]); }
+      else if (z === 'inport') { t.f.zone = 'inports'; t.f.p = i; }
       else if (z === 'empty') t.f.zone = 'apps';
       else return;
       this.key(t, 'ok');
     }
   };
+  function inputRowKey(t, k) {
+    var ports = S.c.inputs, p = clamp(t.f.p || 0, 0, Math.max(0, ports.length - 1));
+    t.f.p = p;
+    if (k === 'left' && p > 0) t.f.p--;
+    else if (k === 'right' && p < ports.length - 1) t.f.p++;
+    else if (k === 'up' || k === 'back') t.f.zone = 'apps';
+    else if (k === 'ok' && ports.length) perform(inputLabel(ports[p]), function (done) { FrameDevice.setSource(ports[p], done); });
+  }
   function listHomeKey(t, k, i, U) {
     var f = t.f, h = S.c.home;
+    if (f.zone === 'inports') { inputRowKey(t, k); return; }
     if (f.zone === 'util') {
       f.u = clamp(f.u, 0, U.length - 1);
       if (k === 'up' && f.u > 0) f.u--;
@@ -575,6 +637,7 @@
     if (k === 'up' && i > 0) setSel(h[i - 1]);
     else if (k === 'right') { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
     else if (k === 'down' && i < h.length - 1) setSel(h[i + 1]);
+    else if (k === 'down' && S.c.inputs.length) { f.zone = 'inports'; f.p = clamp(f.p || 0, 0, S.c.inputs.length - 1); }
     else if (k === 'back') openMessage('leave');
     else if (k === 'ok') { if (h.length) launch(S.sel); else addAppsRoute(); }
   }
@@ -811,6 +874,33 @@
     S.note = app(L.id).name + ' moved to position ' + (t.f.i + 1) + '.';
   }
   function closeEditor() { clearSession(); pop(); }
+  function writeInputState(order, names, label) {
+    var c = next(S.c.home.slice(), S.c.recent.slice());
+    c.inputs = order ? order.slice() : c.inputs;
+    if (names) c.inputNames = names;
+    return write(c, label);
+  }
+  function openInputEditor() {
+    push({ id: 'inputrow', lifted: null, renaming: false, f: { i: 0, part: 'name' } });
+  }
+  function placeInputOrder(t) {
+    var order = t.lifted.order.slice(), sameOrder = order.length === S.c.inputs.length && order.every(function (port, i) { return port === S.c.inputs[i]; });
+    t.f.i = clamp(t.f.i, 0, order.length - 1);
+    t.lifted = null;
+    if (!sameOrder) writeInputState(order, null, 'Reorder inputs');
+  }
+  function commitInputName(t) {
+    var field = document.getElementById('inputNameField'), port = (t.lifted ? t.lifted.order : S.c.inputs)[t.f.i];
+    var text = field ? field.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, 24) : '', names;
+    t.renaming = false;
+    if (field) field.blur();
+    if (!text) return;
+    names = copyInputNames(S.c.inputNames);
+    if (text === defaultInputName(port)) delete names[String(port)];
+    else names[String(port)] = text;
+    writeInputState(null, names, 'Rename input');
+    S.note = inputLabel(port) + ' is a launcher name. The TV source name is unchanged.';
+  }
 
   /* ---------- Settings, Layout and messages ---------- */
   function mode() { for (var i = 0; i < MODES.length; i++) if (MODES[i].id === S.c.mode) return MODES[i]; return MODES[0]; }
@@ -821,6 +911,7 @@
       { id: 'typography', label: 'Typography', value: FONTS[S.c.font].name },
       { id: 'focus', label: 'Focus', value: VALUE_NAMES[S.c.focus] + (materialApplies() ? ', ' + VALUE_NAMES[S.c.material] : '') },
       { id: 'editor', label: 'Apps on Home', value: n + (n === 1 ? ' app' : ' apps') },
+      { id: 'inputrow', label: 'Input row', value: S.c.inputs.length + ' inputs' },
       { id: 'samsung', label: 'Samsung', value: 'Home and TV settings' }];
   }
   function settingsIds() { return settingsRows().map(function (r) { return r.id; }); }
@@ -839,8 +930,46 @@
   };
   function settingsOk(id) {
     if (id === 'editor') openEditor('settings');
+    else if (id === 'inputrow') openInputEditor();
     else openAppearance(id);
   }
+  V.inputrow = {
+    sheet: true,
+    norm: function (t) {
+      var n = (t.lifted ? t.lifted.order : S.c.inputs).length;
+      t.f.i = clamp(t.f.i || 0, 0, Math.max(0, n - 1));
+      if (t.lifted) t.f.part = 'name';
+    },
+    key: function (t, k) {
+      var order = t.lifted ? t.lifted.order : S.c.inputs, n = order.length, i = t.f.i, tmp;
+      if (t.renaming) return;
+      if (t.lifted) {
+        if (k === 'up' && i > 0) { tmp = order[i - 1]; order[i - 1] = order[i]; order[i] = tmp; t.f.i--; }
+        else if (k === 'down' && i < n - 1) { tmp = order[i + 1]; order[i + 1] = order[i]; order[i] = tmp; t.f.i++; }
+        else if (k === 'ok') placeInputOrder(t);
+        else if (k === 'back') { t.f.i = t.lifted.from; t.lifted = null; }
+        return;
+      }
+      if (k === 'back') { pop(); return; }
+      if (t.f.part === 'rename') {
+        if (k === 'left') t.f.part = 'name';
+        else if (k === 'ok') t.renaming = true;
+        return;
+      }
+      if (k === 'up' && i > 0) t.f.i--;
+      else if (k === 'down' && i < n - 1) t.f.i++;
+      else if (k === 'right') t.f.part = 'rename';
+      else if (k === 'ok') t.lifted = { from: i, order: order.slice() };
+    },
+    point: function (t, z, i) {
+      if (t.renaming) { if (z === 'save') commitInputName(t); return; }
+      if (t.lifted) { if (z === 'name' && i === t.f.i) this.key(t, 'ok'); return; }
+      if (z === 'name' || z === 'rename') { t.f.i = i; t.f.part = z; }
+      else if (z === 'head') { pop(); return; }
+      else return;
+      this.key(t, 'ok');
+    }
+  };
   var DETAIL_NAMES = { background: 'Background', layout: 'Layout', typography: 'Typography', focus: 'Focus', rotation: 'Rotation', samsung: 'Samsung', inputs: 'Inputs' };
   function choice(axis, value, disabled) {
     return { action: axis === 'mode' ? 'rotation.' + value : 'choice.' + axis + '.' + value, axis: axis, value: value, disabled: !!disabled,
@@ -1000,7 +1129,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var stage = $('stage'), homeEl = $('home'), caption = $('caption'), utilsEl = $('utils');
   var utilFocusLabel = $('utilFocusLabel'), utilFocusKey = '', appFocusName = $('appFocusName');
-  var dock = $('dock'), shelf = $('shelf'), track = $('track'), plate = $('plate'), matScrim = $('matScrim'), dockEmpty = $('dockEmpty');
+  var dock = $('dock'), shelf = $('shelf'), track = $('track'), plate = $('plate'), matScrim = $('matScrim'), dockEmpty = $('dockEmpty'), inputRow = $('inputRow');
   var cueL = $('cueL'), cueR = $('cueR'), dockAction = $('dockAction');
   var focusStatus = $('focusStatus'), sceneEl = $('scene'), appearanceEl = $('appearance'), appearanceRows = $('appearanceRows'), appearanceDesc = $('appearanceDesc');
   var appearanceBack = $('appearanceBack'), appearanceTitle = $('appearanceTitle'), appearanceStatus = $('appearanceStatus');
@@ -1069,10 +1198,20 @@
     return hs;
   }
 
+  function renderInputRow(t) {
+    var ports = S.c.inputs || [], focus = t.id === 'home' && t.f.zone === 'inports', pitch = 248, width = 220;
+    var total = ports.length ? ports.length * pitch - (pitch - width) : 0, origin = Math.round((1920 - total) / 2), html = '';
+    ports.forEach(function (port, i) {
+      var on = focus && (t.f.p || 0) === i;
+      html += '<button type="button" tabindex="-1" class="input-chip' + (on ? ' is-focus' : '') + '" style="width:' + width + 'px;transform:translate3d(' + (origin + i * pitch) + 'px,0,0)" data-z="inport" data-i="' + i + '" data-action="home.input.' + port + '" aria-label="' + esc(inputLabel(port)) + '"><span>' + esc(inputLabel(port)) + '</span></button>';
+    });
+    setHTML(inputRow, html);
+  }
   function renderHome(t) {
     var hs = homeState(t);
     renderCaption(t, hs);
     renderUtils(hs);
+    renderInputRow(t);
     if (S.c.layout === 'list') renderList(hs);
     else { photoMode = null; renderDock(hs); }
     renderAppFocusName(hs);
@@ -1536,6 +1675,7 @@
         + '<div class="row-cue editor-before" data-slot="otherBefore" aria-hidden="true">' + icon('up') + '</div><div class="row-cue editor-after" data-slot="otherAfter" aria-hidden="true">' + icon('down') + '</div>';
     },
     settings: function () { return '<h2 class="s-title">Settings</h2><div class="settings-overview" data-slot="list"></div><p class="settings-overview-hint"><span class="remote-key">OK</span><span>Open selected group</span></p>'; },
+    inputrow: function () { return '<h2 class="s-title">Input row</h2><p class="s-sub" data-slot="sub"></p><div class="s-head" data-slot="head"></div><div class="input-editor" data-slot="list"></div>'; },
     message: function (t) {
       var m = messageContent(t);
       return '<h2 class="msg-title">' + esc(m.title) + '</h2><p class="msg-line">' + esc(m.line) + '</p><p class="msg-note">' + esc(m.note) + '</p><div class="msg-acts" data-slot="acts"></div>';
@@ -1630,6 +1770,24 @@
       var html = '';
       settingsRows().forEach(function (r) {
         html += '<button type="button" tabindex="-1" class="settings-group' + (r.id === t.f.id ? ' is-focus' : '') + '" data-z="row" data-i="0" data-id="' + r.id + '" data-action="settings.' + (r.id === 'editor' ? 'editor' : 'group.' + r.id) + '"><span class="settings-group-copy"><span class="settings-group-name">' + esc(r.label) + '</span><span class="settings-group-value">' + esc(r.value) + '</span></span>' + icon('right') + '</button>';
+      });
+      setHTML(el.list, html);
+    },
+    inputrow: function (t, el) {
+      var order = t.lifted ? t.lifted.order : S.c.inputs, html = '', port = order[t.f.i], field;
+      setHTML(el.sub, esc(t.renaming ? 'Type a launcher name. The TV source name stays unchanged.' : 'OK picks up a row to move. Right renames that launcher label only.'));
+      setHTML(el.head, '<button type="button" tabindex="-1" class="btn" data-z="head" data-i="0" data-action="inputrow.done"><span>Done</span></button>');
+      if (t.renaming) {
+        setHTML(el.list, '<label class="input-rename">Launcher name<input id="inputNameField" maxlength="24" value="' + esc(inputLabel(port)) + '"></label><button type="button" tabindex="-1" class="btn" data-z="save" data-i="0" data-action="inputrow.save"><span>Save name</span></button>');
+        field = document.getElementById('inputNameField');
+        if (field && document.activeElement !== field) { field.focus(); field.select(); }
+        return;
+      }
+      order.forEach(function (item, i) {
+        var here = i === t.f.i, lifted = !!t.lifted && here;
+        html += '<div class="ir-row' + (here ? ' is-active' : '') + (lifted ? ' is-lifted' : '') + '">'
+          + '<button type="button" tabindex="-1" class="ir-name' + (here && t.f.part !== 'rename' ? ' is-focus' : '') + '" data-z="name" data-i="' + i + '" data-action="inputrow.move.' + item + '"><span>' + esc(inputLabel(item)) + '</span></button>'
+          + '<button type="button" tabindex="-1" class="ir-rename' + (here && t.f.part === 'rename' ? ' is-focus' : '') + '" data-z="rename" data-i="' + i + '" data-action="inputrow.rename.' + item + '"><span>Rename</span></button></div>';
       });
       setHTML(el.list, html);
     },
@@ -1863,7 +2021,15 @@
   });
   var heldKeys = {};
   document.addEventListener('keydown', function (ev) {
-    var code = ev.keyCode, k = KEYS[code];
+    var code = ev.keyCode, k = KEYS[code], naming = document.activeElement && document.activeElement.id === 'inputNameField';
+    if (naming) {
+      if (code === 13 || code === 27 || code === 10009) {
+        ev.preventDefault();
+        if (top().id === 'inputrow') commitInputName(top());
+        render();
+      }
+      return;
+    }
     if (code === 9) { ev.preventDefault(); return; }
     if (!k || ev.metaKey || ev.ctrlKey || ev.altKey) return;
     ev.preventDefault();

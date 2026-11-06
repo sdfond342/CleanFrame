@@ -361,9 +361,9 @@ try {
           });
         }, { layout, controls });
         check(layout + '/' + controls + ' uses spacing between visible children at ' + width,
-          spacing.length === 3 && spacing.every(s => s.children === (controls === 'both' ? 2 : 1) && Math.abs(s.extraWidth - s.gap) < .5), spacing);
+          spacing.length === 2 && spacing.every(s => s.children === (controls === 'both' ? 2 : 1) && Math.abs(s.extraWidth - s.gap) < .5), spacing);
         const focused = [];
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 2; i++) {
           if (i) await nav(layout === 'dock' ? 'right' : 'down');
           focused.push(await current.evaluate(() => {
             const button = document.querySelector('#utils .u.is-focus'), lens = document.querySelector('.ut-lens.is-current');
@@ -402,7 +402,7 @@ try {
         const scale = document.getElementById('stage').getBoundingClientRect().width / 1920;
         return elements.map(e => (e.querySelector('.ico').getBoundingClientRect().left - e.querySelector('.settings-group-copy').getBoundingClientRect().right) / scale);
       });
-      check('Settings group arrows stay separate from their copy at ' + width, groups.length === 6 && groups.every(gap => gap >= 31.5), groups);
+      check('Settings group arrows stay separate from their copy at ' + width, groups.length === 7 && groups.every(gap => gap >= 31.5), groups);
       await wallpaper();
       const caption = await current.locator('.wallpaper-preview-name').evaluate(e => {
         const scale = document.getElementById('stage').getBoundingClientRect().width / 1920;
@@ -464,19 +464,45 @@ try {
     await current.evaluate(() => window.dispatchEvent(new Event('focus')));
     await scene('home'); await act('home.app.netflix'); await current.waitForFunction(() => __tv.calls.length === 2);
     check('Primary app keeps verified target', (await current.evaluate(() => __tv.calls.at(-1))).id === IDS[1]);
-    await current.evaluate(() => window.dispatchEvent(new Event('focus')));
-    await act('util.art'); await current.waitForFunction(() => __tv.calls.length === 3);
-    const art = await current.evaluate(() => __tv.calls.at(-1));
-    check('Art Mode uses app-control with fullscreen request', art.method === 'launchAppControl' && art.id === 'org.tizen.art-app' && art.control.data.some(d => d.key === 'mode' && d.value[0] === 'fullscreen'), art);
+    check('Launcher does not offer Art Mode', await current.locator('[data-action="util.art"]').count() === 0 && !(await current.locator('#utils').innerText()).includes('Art Mode'));
     await current.evaluate(() => window.dispatchEvent(new Event('focus'))); await group('samsung'); await act('samsung.home');
-    await current.waitForFunction(() => __tv.calls.length === 4);
+    await current.waitForFunction(() => __tv.calls.length === 3);
     check('Samsung escape keeps CSFS target', (await current.evaluate(() => __tv.calls.at(-1))).id === 'com.samsung.tv.csfs');
     await current.evaluate(() => window.dispatchEvent(new Event('focus'))); await group('samsung'); await act('samsung.settings');
-    await current.waitForFunction(() => __tv.calls.length === 5);
+    await current.waitForFunction(() => __tv.calls.length === 4);
     check('TV settings keeps installed target', (await current.evaluate(() => __tv.calls.at(-1))).id === 'com.samsung.tv.coba.setting');
     await current.evaluate(() => { window.dispatchEvent(new Event('focus')); __tv.launchFailure = true; });
     await scene('home'); await act('home.app.netflix'); await current.waitForFunction(() => ShoreQA.where().view === 'message');
     check('Launch failure is shown', /could not|unavailable|try again/i.test(await current.locator('#stage').innerText()));
+  });
+  await run('Separate HDMI row names, order and launcher-only rename', async () => {
+    await page();
+    const chips = () => current.locator('#inputRow .input-chip').allTextContents();
+    check('Input row starts HDMI1, HDMI2, Kodi, HDMI4', (await chips()).join(',') === 'HDMI1,HDMI2,Kodi,HDMI4');
+    check('Input chips stay outside the app dock', await current.evaluate(() => [...document.querySelectorAll('#inputRow .input-chip')].length === 4 && [...document.querySelectorAll('#dock .input-chip')].length === 0));
+    await nav('down');
+    check('Down from the app row enters HDMI1', (await call('where')).focusAction === 'home.input.1' && (await call('where')).focusCount === 1);
+    await nav('right', 'right');
+    check('The third input is the launcher name Kodi', (await call('where')).focusAction === 'home.input.3' && (await call('where')).focus === 'Kodi');
+    const before = (await state()).writes;
+    await nav('ok');
+    await current.waitForFunction(() => __tv.calls.some(c => c.method === 'setSource'));
+    check('Kodi asks the public API for port 3', await current.evaluate(() => __tv.calls.at(-2).method === 'setSource' && __tv.calls.at(-2).number === 3 && __tv.calls.at(-1).id === 'org.tizen.tv-viewer'));
+    await current.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await scene('settings'); await act('settings.group.inputrow');
+    await act('inputrow.move.1'); await nav('down', 'ok');
+    check('Input reorder persists apart from the app row', (await stored()).inputs.join(',') === '2,1,3,4' && (await stored()).dock[0] === 'stremio');
+    await act('inputrow.rename.3');
+    await current.locator('#inputNameField').fill('Cinema');
+    await act('inputrow.save');
+    check('Rename is launcher-only and keeps port 3', (await stored()).inputNames['3'] === 'Cinema' && (await stored()).inputs.includes(3));
+    await act('inputrow.done'); await scene('home');
+    check('Home row shows the saved launcher label', (await chips()).join(',') === 'HDMI2,HDMI1,Cinema,HDMI4');
+    const calls = await current.evaluate(() => __tv.calls.length);
+    await nav('down', 'right', 'right', 'right', 'ok');
+    await current.waitForFunction(() => ShoreQA.where().view === 'message');
+    check('A port the TV did not report is an error and does not switch', (await current.locator('#stage').innerText()).includes('no longer available') && await current.evaluate(start => __tv.calls.length === start, calls));
+    check('Input edits did not launch an app shortcut', (await state()).writes > before && (await stored()).home.join(',') === 'stremio,netflix,disneyplus,youtube,appletv,primevideo,abciview,sbs,applemusic');
   });
   await run('Independent app identity self-filter', async () => {
     const appId = 'AbCdEf1234.MyHome';
@@ -513,6 +539,26 @@ try {
       return { html: row.innerHTML, src: img && img.src, imageDisplay: img && getComputedStyle(img).display, initialsVisibility: mark && getComputedStyle(mark.firstChild).visibility, complete: img && img.complete, width: img && img.naturalWidth, text: row.textContent };
     }, EXTRA);
     check('Failed native icon leaves readable initials and app name', fallback.imageDisplay === 'none' && fallback.initialsVisibility === 'visible' && fallback.text.includes('Family'), fallback);
+    await closePage();
+    await page({ catalog: CATALOG.map(a => a.id === IDS[1] ? { ...a, iconPath: '/home/assets/icons/netflix.svg' } : a) });
+    await library();
+    await current.waitForFunction(() => { const img = document.querySelector('[data-action="apps.open.netflix"] img'); return img && img.complete && img.naturalWidth > 0; });
+    check('Known app prefers its installed icon in All apps', await current.evaluate(() => { const img = document.querySelector('[data-action="apps.open.netflix"] img'); return img && img.parentNode.classList.contains('has-native-icon') && document.querySelector('[data-action="apps.open.netflix"]').textContent.includes('Netflix'); }));
+    await scene('home');
+    await current.waitForFunction(() => { const img = document.querySelector('[data-action="home.app.netflix"] img'); return img && img.complete && img.naturalWidth > 0; });
+    check('Home tile uses the same installed icon', await current.evaluate(() => { const img = document.querySelector('[data-action="home.app.netflix"] img'); return !!img && img.getAttribute('alt') === '' && document.querySelector('[data-action="home.app.netflix"]').getAttribute('aria-label') === 'Netflix'; }));
+    await editor();
+    check('Editor uses the installed icon without dropping the name', await current.evaluate(() => { const row = document.querySelector('[data-action="editor.move.netflix"]'); const img = row && row.querySelector('img'); return !!img && img.complete && img.naturalWidth > 0 && row.textContent.includes('Netflix'); }));
+    await closePage();
+    await page({ catalog: CATALOG.map(a => a.id === IDS[1] ? { ...a, iconPath: '/home/assets/icons/missing-native-icon.png' } : a) });
+    current.__expectedFailures.push('/missing-native-icon.png');
+    await library();
+    await current.waitForFunction(() => { const img = document.querySelector('[data-action="apps.open.netflix"] img'); return img && img.complete && img.src.includes('missing-native-icon.png'); });
+    check('Known app icon failure keeps initials and the Netflix name', await current.evaluate(() => { const row = document.querySelector('[data-action="apps.open.netflix"]'), img = row.querySelector('img'); return getComputedStyle(img).display === 'none' && getComputedStyle(row.querySelector('.native-icon span')).visibility === 'visible' && row.textContent.includes('Netflix'); }));
+    await closePage();
+    await page({ catalog: CATALOG.map(a => a.id === IDS[1] ? { ...a, iconPath: 'https://example.invalid/icon.png' } : a) });
+    await library();
+    check('Remote icon URLs are not requested', await current.evaluate(() => ![...document.querySelectorAll('img')].some(img => img.src.includes('example.invalid'))));
   });
   await run('Catalogue response after closing and reopening', async () => {
     await page();
@@ -594,8 +640,8 @@ try {
   });
   await run('Settings overview and visible choices', async () => {
     await page(); await scene('settings');
-    const expected = ['settings.group.background', 'settings.group.layout', 'settings.group.typography', 'settings.group.focus', 'settings.editor', 'settings.group.samsung'];
-    check('Overview has all six settings groups', same((await call('actions')).filter(a => expected.includes(a)).sort(), expected.slice().sort()));
+    const expected = ['settings.group.background', 'settings.group.layout', 'settings.group.typography', 'settings.group.focus', 'settings.editor', 'settings.group.inputrow', 'settings.group.samsung'];
+    check('Overview has the settings groups', same((await call('actions')).filter(a => expected.includes(a)).sort(), expected.slice().sort()));
     const specs = {
       background: { bg: ['dark', 'light', 'photo'] },
       layout: { layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], controls: ['icons', 'both', 'text'] },

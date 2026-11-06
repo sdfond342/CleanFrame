@@ -145,6 +145,20 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000}
 .dock-action.is-focus{background:var(--solid);color:var(--solid-ink)}
 .dock-action>span{display:block;max-width:100%;padding:0 20px;overflow:hidden;text-overflow:ellipsis}
 .l-list .dock,.l-list .cue,.l-list .dock-action{display:none}
+.input-row{position:absolute;left:0;top:1008px;width:1920px;height:56px;z-index:4}
+.input-chip{position:absolute;top:0;height:56px;border-radius:28px;background:rgba(255,255,255,.12);color:#f6f1e7;font-size:28px;font-weight:500;letter-spacing:-.3px}
+.input-chip.is-focus{background:var(--solid);color:var(--solid-ink)}
+.input-chip span{display:block;padding:0 16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:56px;text-align:center}
+.input-editor{position:absolute;left:140px;top:250px;width:1100px}
+.ir-row{position:relative;height:84px;margin-bottom:12px}
+.ir-name,.ir-rename{height:72px;border-radius:24px;font-size:32px;font-weight:500;color:var(--ink);background:rgba(255,255,255,.08)}
+.ir-name{width:700px;text-align:left;padding:0 28px}
+.ir-rename{position:absolute;left:724px;top:0;width:240px}
+.ir-name.is-focus,.ir-rename.is-focus{background:var(--solid);color:var(--solid-ink)}
+.ir-row.is-lifted .ir-name{transform:translateX(16px)}
+.input-rename{display:block;font-size:28px;font-weight:500}
+.input-rename input{display:block;width:700px;height:72px;margin-top:12px;padding:0 28px;border:0;border-radius:24px;background:rgba(255,255,255,.12);color:var(--ink);font:inherit}
+.input-editor .btn{margin-top:24px}
 
 /* Shared whole-row cues for the app library and two-column editor. */
 .row-cue{position:absolute;width:40px;height:40px;display:none;align-items:center;justify-content:center;color:var(--mute);pointer-events:none}

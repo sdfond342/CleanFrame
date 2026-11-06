@@ -5,7 +5,7 @@
   /* ---------- Bundled data ---------- */
   var ASSETS = 'assets/', ICONS = ASSETS + 'icons/', WP = ASSETS + 'wallpapers/';
   var CAP = 9, SCRIM_Y = 560;
-  var DOCK_MODES = { both: { tw: 288, th: 200, pitch: 296 }, text: { tw: 288, th: 104, pitch: 296 }, icons: { tw: 176, th: 144, pitch: 184 } };
+  var DOCK_MODES = { both: { tw: 312, th: 176, pitch: 320 }, text: { tw: 312, th: 112, pitch: 320 }, icons: { tw: 240, th: 136, pitch: 248 } };
   var GRID_ROW = 240, GRID_COL = 344, COLS = 5;
   var ED_ROW = 80, ED_SEP = 56, ED_VIEW = 752;
   var PH_TOP = 220, PH_PITCH = 128, PH_FULL = 5, PH_HEIGHT = 944, PH_COMPACT_TOP = 144, PH_COMPACT_PITCH = 88, PH_COMPACT_VISIBLE = 9;
@@ -44,9 +44,9 @@
     newsreader: { name: 'Newsreader', family: 'Study Newsreader', display: 400, ui: 400, clock: 400 }
   };
   var PRIVATE_FONTS = window.CleanFramePrivateFontIDs || [], fontMetrics = {}, unavailableFonts = {}, widthCache = {}, fontRevision = 0, fontsReady = false;
-  var LOOK_VALUES = { bg: ['dark', 'light', 'photo'], layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], font: Object.keys(FONTS).filter(function (id) { return id === 'manrope' || PRIVATE_FONTS.indexOf(id) >= 0; }), controls: ['icons', 'both', 'text'], focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'] };
-  var LOOK_NAMES = { bg: 'Background', layout: 'Layout', apps: 'Apps', font: 'Font', controls: 'Home controls', focus: 'Focus', material: 'Material' };
-  var VALUE_NAMES = { dark: 'Dark', light: 'Light', photo: 'Photo', list: 'List', dock: 'Dock', type: 'Type', glass: 'Glass', soft: 'Soft', frost: 'Frost', tint: 'Clear tint', icons: 'Icons', both: 'Icons and text', text: 'Text' };
+  var LOOK_VALUES = { bg: ['dark', 'light', 'photo'], layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], font: Object.keys(FONTS).filter(function (id) { return id === 'manrope' || PRIVATE_FONTS.indexOf(id) >= 0; }), controls: ['icons', 'both', 'text'], focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'], shelf: ['glass', 'clear'] };
+  var LOOK_NAMES = { bg: 'Background', layout: 'Layout', apps: 'Apps', font: 'Font', controls: 'Home controls', focus: 'Focus', material: 'Material', shelf: 'Dock background' };
+  var VALUE_NAMES = { dark: 'Dark', light: 'Light', photo: 'Photo', list: 'List', dock: 'Dock', type: 'Type', glass: 'Glass', soft: 'Soft', frost: 'Frost', tint: 'Clear tint', icons: 'Icons', both: 'Icons and text', text: 'Text', clear: 'Clear' };
   var UTIL = { apps: ['All apps', 'apps'], arrange: ['Arrange', 'arrange'], settings: ['Settings', 'settings'] };
   var INPUT_PORTS = [1, 2, 3, 4];
   var MSG = {
@@ -85,7 +85,7 @@
     for (var i = 0; i < list.length; i++) if (list[i].toLowerCase() === v) return list[i];
     return fallback;
   }
-  function lookOf(c) { return { bg: c.bg, wall: c.wall, layout: c.layout, apps: c.apps, font: c.font, controls: c.controls, focus: c.focus, material: c.material }; }
+  function lookOf(c) { return { bg: c.bg, wall: c.wall, layout: c.layout, apps: c.apps, font: c.font, controls: c.controls, focus: c.focus, material: c.material, shelf: c.shelf || 'glass' }; }
   function defaultInputName(port) {
     if (port === 1) return 'HDMI1';
     if (port === 2) return 'HDMI2';
@@ -320,7 +320,7 @@
     return { size: size, top: (compact ? 10.66 : size === 76 ? 10.36 : 9.68) + fontShift('display', size) - (compact && homeFont() === 'newsreader' ? .7 : 0), width: Math.min(limit, width), ellipsis: width > limit };
   }
   function listPlateWidth(id, compact) {
-    if (S.c.apps === 'icons') return compact ? 120 : 144;
+    if (S.c.apps === 'icons') return compact ? 168 : 248;
     var text = S.c.apps === 'text';
     return clamp(Math.ceil(photoLabel(id, compact).width + (text ? 84 : compact ? 156 : 184)), text ? 280 : 360, text ? compact ? 724 : 1076 : compact ? 796 : 1176);
   }
@@ -385,7 +385,7 @@
     return {
       bg: pick(modern.bg, LOOK_VALUES.bg, legacyList ? 'dark' : 'photo'), layout: pick(modern.layout, LOOK_VALUES.layout, legacyList ? 'list' : 'dock'),
       apps: pick(modern.apps, LOOK_VALUES.apps, legacyList ? 'text' : 'both'), controls: pick(modern.controls, LOOK_VALUES.controls, 'both'),
-      focus: pick(modern.focus, LOOK_VALUES.focus, legacyList ? 'type' : 'glass'), material: pick(modern.material, LOOK_VALUES.material, 'soft'),
+      focus: pick(modern.focus, LOOK_VALUES.focus, legacyList ? 'type' : 'glass'), material: pick(modern.material, LOOK_VALUES.material, 'soft'), shelf: pick(modern.shelf, LOOK_VALUES.shelf, 'glass'),
       font: pick(modern.font, LOOK_VALUES.font, 'manrope'), wall: wall(modern.wall || s.wallpaper) ? modern.wall || s.wallpaper : WALLS[0].id,
       home: h, recent: recent, lastApp: h.indexOf(s.lastApp) >= 0 ? s.lastApp : h[0],
       mode: pick(s.mode, MODES.map(function (m) { return m.id; }), 'fixed'),
@@ -568,7 +568,7 @@
     var i = ensureSel();
     clearSession();
     refreshCatalog();
-    push({ id: 'editor', origin: origin, lifted: null, top: 0, otherReturn: { id: otherList()[0] || null, index: 0, top: 0 }, f: { zone: S.c.home.length ? 'home' : 'other', i: Math.max(0, i), part: 'name', h: 1, j: 0 } });
+    push({ id: 'editor', origin: origin, lifted: null, top: 0, homeTop: 0, renaming: false, kb: null, kbText: '', renamePort: 0, otherReturn: { id: otherList()[0] || null, index: 0, top: 0 }, f: { zone: S.c.home.length ? 'home' : (S.c.inputs.length ? 'inputs' : 'other'), i: Math.max(0, i), part: 'name', h: 1, j: 0, p: 0 } });
   }
   function openWallpaper() {
     var i = wallIndex(S.c.wall);
@@ -590,14 +590,20 @@
         f.u = clamp(f.u, 0, U.length - 1);
         if (k === x.prev && f.u > 0) f.u--;
         else if (k === x.next && f.u < U.length - 1) f.u++;
-        else if (k === x.inn || k === 'back') f.zone = 'apps';
+        else if (k === 'back') f.zone = 'apps';
+        else if (k === x.inn) {
+          if (S.c.inputs.length) { f.zone = 'inports'; f.p = clamp(f.p || 0, 0, S.c.inputs.length - 1); }
+          else f.zone = 'apps';
+        }
         else if (k === 'ok') { S.lastUtil = f.u; utilAction(U[f.u]); return; }
         S.lastUtil = f.u;
         return;
       }
       f.zone = 'apps';
-      if (k === x.out) { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
-      else if (k === 'down' && S.c.inputs.length) { f.zone = 'inports'; f.p = clamp(f.p || 0, 0, S.c.inputs.length - 1); }
+      if (k === x.out) {
+        if (S.c.inputs.length) { f.zone = 'inports'; f.p = clamp(f.p || 0, 0, S.c.inputs.length - 1); }
+        else { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
+      }
       else if (k === 'back') openMessage('leave');
       else if (!h.length) { if (k === 'ok') addAppsRoute(); }
       else if (k === x.prev && i > 0) setSel(h[i - 1]);
@@ -618,7 +624,8 @@
     t.f.p = p;
     if (k === 'left' && p > 0) t.f.p--;
     else if (k === 'right' && p < ports.length - 1) t.f.p++;
-    else if (k === 'up' || k === 'back') t.f.zone = 'apps';
+    else if (k === 'down' || k === 'back') t.f.zone = 'apps';
+    else if (k === 'up' && S.c.layout !== 'list') { t.f.zone = 'util'; t.f.u = clamp(S.lastUtil, 0, utils().length - 1); }
     else if (k === 'ok' && ports.length) perform(inputLabel(ports[p]), function (done) { FrameDevice.setSource(ports[p], done); });
   }
   function listHomeKey(t, k, i, U) {
@@ -635,9 +642,9 @@
     }
     f.zone = 'apps';
     if (k === 'up' && i > 0) setSel(h[i - 1]);
+    else if (k === 'up' && S.c.inputs.length) { f.zone = 'inports'; f.p = clamp(f.p || 0, 0, S.c.inputs.length - 1); }
     else if (k === 'right') { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
     else if (k === 'down' && i < h.length - 1) setSel(h[i + 1]);
-    else if (k === 'down' && S.c.inputs.length) { f.zone = 'inports'; f.p = clamp(f.p || 0, 0, S.c.inputs.length - 1); }
     else if (k === 'back') openMessage('leave');
     else if (k === 'ok') { if (h.length) launch(S.sel); else addAppsRoute(); }
   }
@@ -779,6 +786,76 @@
   function otherList() { var o = otherGroups(); return o.recent.concat(o.rest); }
   function editorCut() { return 5; }
   function editorHomeY(i) { return i * ED_ROW + (i >= editorCut() ? 24 : 0); }
+  function editorOrder(t) { return t.lifted && t.lifted.kind !== 'input' ? t.lifted.order : S.c.home; }
+  function inputOrder(t) { return t.lifted && t.lifted.kind === 'input' ? t.lifted.order : S.c.inputs; }
+  function editorInputOrigin(count) { return count ? editorHomeY(count - 1) + ED_ROW + 8 : 0; }
+  function kbRows(t) {
+    if (t.kb && t.kb.mode === 'nums') return [['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'], ['-', '/', ':', ';', '(', ')', '&', '@'], ['.', ',', '?', '!', "'", '"', 'bksp'], ['abc', 'space', 'done', 'cancel']];
+    return [['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'], ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'], ['shift', 'z', 'x', 'c', 'v', 'b', 'n', 'm', 'bksp'], ['nums', 'space', 'done', 'cancel']];
+  }
+  function kbLabel(t, key) {
+    if (key === 'shift') return t.kb.shift ? 'abc' : 'ABC';
+    if (key === 'bksp') return 'Delete';
+    if (key === 'nums') return '123';
+    if (key === 'abc') return 'ABC';
+    if (key === 'space') return 'Space';
+    if (key === 'done') return 'Done';
+    if (key === 'cancel') return 'Cancel';
+    if (t.kb.shift && key.length === 1 && key >= 'a' && key <= 'z') return key.toUpperCase();
+    return key;
+  }
+  function kbInsert(t, ch) { t.kbText = ((t.kbText || '') + ch).replace(/[\u0000-\u001f]/g, '').slice(0, 24); }
+  function kbAction(key) { return 'editor.key.' + (key === "'" ? 'apos' : key === '"' ? 'quot' : key); }
+  function closeInputKeyboard(t, part) { t.renaming = false; t.f.zone = 'inputs'; t.f.part = part || 'rename'; }
+  function openInputKeyboard(t) {
+    var order = inputOrder(t);
+    t.renamePort = order[t.f.p];
+    t.kbText = inputLabel(t.renamePort);
+    t.kb = { r: 0, c: 0, shift: false, mode: 'letters' };
+    t.renaming = true;
+    t.f.zone = 'keys';
+  }
+  function commitInputRename(t) {
+    var port = t.renamePort, text = (t.kbText || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 24), names;
+    if (!port) { closeInputKeyboard(t, 'name'); return; }
+    if (!text || text === inputLabel(port)) { closeInputKeyboard(t, 'name'); return; }
+    names = copyInputNames(S.c.inputNames);
+    if (text === defaultInputName(port)) delete names[String(port)];
+    else names[String(port)] = text;
+    if (!writeInputState(null, names, 'Rename input')) return;
+    closeInputKeyboard(t, 'name');
+    S.note = inputLabel(port) + ' is a launcher name. The TV source name is unchanged.';
+  }
+  function kbActivate(t) {
+    var rows = kbRows(t), key = rows[t.kb.r][t.kb.c];
+    if (key === 'shift') { t.kb.shift = !t.kb.shift; return; }
+    if (key === 'nums') { t.kb.mode = 'nums'; t.kb.r = 0; t.kb.c = 0; return; }
+    if (key === 'abc') { t.kb.mode = 'letters'; t.kb.r = 0; t.kb.c = 0; return; }
+    if (key === 'bksp') { t.kbText = (t.kbText || '').slice(0, -1); return; }
+    if (key === 'space') { kbInsert(t, ' '); return; }
+    if (key === 'done') { commitInputRename(t); return; }
+    if (key === 'cancel') { closeInputKeyboard(t, 'rename'); return; }
+    kbInsert(t, kbLabel(t, key));
+  }
+  function kbPanelHtml(t) {
+    var rows = kbRows(t), html = '<div class="kb-name">' + esc(t.kbText || '') + '</div><div class="kb-grid">', r, c, key, label, x, w, cols, count, keyW, rowW, start, foot, widths;
+    for (r = 0; r < rows.length - 1; r++) {
+      cols = rows[r]; count = cols.length; keyW = Math.floor((752 - 8 * (count - 1)) / count);
+      rowW = count * keyW + (count - 1) * 8; start = Math.floor((752 - rowW) / 2);
+      for (c = 0; c < count; c++) {
+        key = cols[c]; label = kbLabel(t, key);
+        html += '<button type="button" tabindex="-1" class="kb-key' + (t.kb.r === r && t.kb.c === c ? ' is-focus' : '') + '" style="left:' + (start + c * (keyW + 8)) + 'px;top:' + (r * 68) + 'px;width:' + keyW + 'px" data-z="key" data-i="' + c + '" data-id="' + r + '" data-action="' + kbAction(key) + '" aria-label="' + esc(label) + '"><span>' + esc(label) + '</span></button>';
+      }
+    }
+    html += '</div><div class="kb-foot">';
+    foot = rows[rows.length - 1]; widths = [108, 312, 150, 150]; x = 0;
+    for (c = 0; c < foot.length; c++) {
+      key = foot[c]; label = kbLabel(t, key); w = widths[c];
+      html += '<button type="button" tabindex="-1" class="kb-key' + (t.kb.r === rows.length - 1 && t.kb.c === c ? ' is-focus' : '') + '" style="left:' + x + 'px;top:0;width:' + w + 'px" data-z="key" data-i="' + c + '" data-id="' + (rows.length - 1) + '" data-action="' + kbAction(key) + '" aria-label="' + esc(label) + '"><span>' + esc(label) + '</span></button>';
+      x += w + 8;
+    }
+    return html + '</div>';
+  }
   function editorOtherY(j) {
     var o = otherGroups();
     return j * ED_ROW + (o.recent.length ? ED_SEP : 0) + (o.recent.length && j >= o.recent.length ? ED_SEP : 0);
@@ -804,14 +881,36 @@
   V.editor = {
     sheet: true,
     norm: function (t) {
-      var f = t.f, nh = (t.lifted ? t.lifted.order : S.c.home).length, no = otherList().length;
+      var f = t.f, nh = editorOrder(t).length, no = otherList().length, ni = inputOrder(t).length;
       f.i = clamp(f.i, 0, Math.max(0, nh - 1));
       f.j = clamp(f.j, 0, Math.max(0, no - 1));
-      if (f.zone === 'home' && !nh) f.zone = no ? 'other' : 'head';
-      if (f.zone === 'other' && !no) f.zone = nh ? 'home' : 'head';
+      f.p = clamp(f.p || 0, 0, Math.max(0, ni - 1));
+      if (t.renaming) { f.zone = 'keys'; if (!t.kb) t.kb = { r: 0, c: 0, shift: false, mode: 'letters' }; return; }
+      if (t.lifted && t.lifted.kind === 'input') { f.zone = 'inputs'; f.part = 'name'; return; }
+      if (f.zone === 'keys') f.zone = ni ? 'inputs' : (nh ? 'home' : 'head');
+      if (f.zone === 'home' && !nh) f.zone = ni ? 'inputs' : (no ? 'other' : 'head');
+      if (f.zone === 'inputs' && !ni) f.zone = nh ? 'home' : (no ? 'other' : 'head');
+      if (f.zone === 'other' && !no) f.zone = nh ? 'home' : (ni ? 'inputs' : 'head');
     },
     key: function (t, k) {
-      var f = t.f, H = t.lifted ? t.lifted.order : S.c.home, O = otherList(), nh = H.length, no = O.length, d, tmp;
+      var f = t.f, H = editorOrder(t), P = inputOrder(t), O = otherList(), nh = H.length, ni = P.length, no = O.length, d, tmp, rows;
+      if (t.renaming) {
+        rows = kbRows(t);
+        if (k === 'left' && t.kb.c > 0) t.kb.c--;
+        else if (k === 'right' && t.kb.c < rows[t.kb.r].length - 1) t.kb.c++;
+        else if (k === 'up' && t.kb.r > 0) { t.kb.r--; t.kb.c = Math.min(t.kb.c, rows[t.kb.r].length - 1); }
+        else if (k === 'down' && t.kb.r < rows.length - 1) { t.kb.r++; t.kb.c = Math.min(t.kb.c, rows[t.kb.r].length - 1); }
+        else if (k === 'ok') kbActivate(t);
+        else if (k === 'back') closeInputKeyboard(t, 'rename');
+        return;
+      }
+      if (t.lifted && t.lifted.kind === 'input') {
+        d = k === 'up' ? -1 : k === 'down' ? 1 : 0;
+        if (d && f.p + d >= 0 && f.p + d < ni) { tmp = P[f.p + d]; P[f.p + d] = P[f.p]; P[f.p] = tmp; f.p += d; S.err = null; }
+        else if (k === 'ok') placeInputOrder(t);
+        else if (k === 'back') { f.p = t.lifted.from; t.lifted = null; S.err = null; }
+        return;
+      }
       if (t.lifted) {
         d = k === 'up' ? -1 : k === 'down' ? 1 : 0;
         if (d && f.i + d >= 0 && f.i + d < nh) { tmp = H[f.i + d]; H[f.i + d] = H[f.i]; H[f.i] = tmp; f.i += d; S.err = null; }
@@ -823,17 +922,27 @@
       if (f.zone === 'head') {
         if (k === 'left' && f.h > 0) f.h--;
         else if (k === 'right' && f.h < 1) f.h++;
-        else if (k === 'down') { if (no) returnOther(t); else if (nh) f.zone = 'home'; }
+        else if (k === 'down') { if (no) returnOther(t); else if (nh) f.zone = 'home'; else if (ni) f.zone = 'inputs'; }
         else if (k === 'ok') { begin(); if (f.h === 0) undoLast(null); else closeEditor(t); }
       } else if (f.zone === 'home') {
         if (k === 'up') { if (f.i > 0) f.i--; else f.zone = 'head'; }
-        else if (k === 'down') { if (f.i < nh - 1) f.i++; }
+        else if (k === 'down') { if (f.i < nh - 1) f.i++; else if (ni) { f.zone = 'inputs'; f.p = 0; f.part = 'name'; } }
         else if (k === 'right') { if (f.part === 'name') f.part = 'remove'; else if (no) returnOther(t); }
         else if (k === 'left') { if (f.part === 'remove') f.part = 'name'; }
         else if (k === 'ok') {
           begin();
           if (f.part === 'name') t.lifted = { id: H[f.i], from: f.i, order: H.slice(), snap: snap() };
           else editorRemove(t, H[f.i]);
+        }
+      } else if (f.zone === 'inputs') {
+        if (k === 'up') { if (f.p > 0) f.p--; else if (nh) { f.zone = 'home'; f.i = nh - 1; f.part = 'name'; } else f.zone = 'head'; }
+        else if (k === 'down') { if (f.p < ni - 1) f.p++; }
+        else if (k === 'right') { if (f.part === 'name') f.part = 'rename'; else if (no) returnOther(t); }
+        else if (k === 'left') { if (f.part === 'rename') f.part = 'name'; }
+        else if (k === 'ok') {
+          begin();
+          if (f.part === 'name') t.lifted = { kind: 'input', port: P[f.p], from: f.p, order: P.slice() };
+          else openInputKeyboard(t);
         }
       } else {
         if (k === 'up') { if (f.j > 0) { f.j--; rememberOther(t); } else f.zone = 'head'; }
@@ -842,9 +951,12 @@
         else if (k === 'ok') { begin(); editorAdd(t, O[f.j]); }
       }
     },
-    point: function (t, z, i) {
+    point: function (t, z, i, id) {
+      if (t.renaming) { if (z === 'key') { t.kb.r = +id; t.kb.c = i; this.key(t, 'ok'); } return; }
+      if (t.lifted && t.lifted.kind === 'input') { if (z === 'iname' && i === t.f.p) this.key(t, 'ok'); return; }
       if (t.lifted) { if (z === 'name' && i === t.f.i) this.key(t, 'ok'); return; }
       if (z === 'name' || z === 'remove') { t.f.zone = 'home'; t.f.i = i; t.f.part = z; }
+      else if (z === 'iname' || z === 'irename') { t.f.zone = 'inputs'; t.f.p = i; t.f.part = z === 'iname' ? 'name' : 'rename'; }
       else if (z === 'other') { t.f.zone = 'other'; t.f.j = i; rememberOther(t); }
       else if (z === 'head') { t.f.zone = 'head'; t.f.h = i; }
       else return;
@@ -880,26 +992,13 @@
     if (names) c.inputNames = names;
     return write(c, label);
   }
-  function openInputEditor() {
-    push({ id: 'inputrow', lifted: null, renaming: false, f: { i: 0, part: 'name' } });
-  }
   function placeInputOrder(t) {
-    var order = t.lifted.order.slice(), sameOrder = order.length === S.c.inputs.length && order.every(function (port, i) { return port === S.c.inputs[i]; });
-    t.f.i = clamp(t.f.i, 0, order.length - 1);
+    var L = t.lifted, order = L.order.slice(), i, same = order.length === S.c.inputs.length;
+    for (i = 0; same && i < order.length; i++) if (order[i] !== S.c.inputs[i]) same = false;
+    if (same) { t.lifted = null; return; }
+    if (!writeInputState(order, null, 'Reorder inputs')) return;
     t.lifted = null;
-    if (!sameOrder) writeInputState(order, null, 'Reorder inputs');
-  }
-  function commitInputName(t) {
-    var field = document.getElementById('inputNameField'), port = (t.lifted ? t.lifted.order : S.c.inputs)[t.f.i];
-    var text = field ? field.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, 24) : '', names;
-    t.renaming = false;
-    if (field) field.blur();
-    if (!text) return;
-    names = copyInputNames(S.c.inputNames);
-    if (text === defaultInputName(port)) delete names[String(port)];
-    else names[String(port)] = text;
-    writeInputState(null, names, 'Rename input');
-    S.note = inputLabel(port) + ' is a launcher name. The TV source name is unchanged.';
+    S.note = inputLabel(L.port) + ' moved to position ' + (t.f.p + 1) + '.';
   }
 
   /* ---------- Settings, Layout and messages ---------- */
@@ -911,7 +1010,6 @@
       { id: 'typography', label: 'Typography', value: FONTS[S.c.font].name },
       { id: 'focus', label: 'Focus', value: VALUE_NAMES[S.c.focus] + (materialApplies() ? ', ' + VALUE_NAMES[S.c.material] : '') },
       { id: 'editor', label: 'Apps on Home', value: n + (n === 1 ? ' app' : ' apps') },
-      { id: 'inputrow', label: 'Input row', value: S.c.inputs.length + ' inputs' },
       { id: 'samsung', label: 'Samsung', value: 'Home and TV settings' }];
   }
   function settingsIds() { return settingsRows().map(function (r) { return r.id; }); }
@@ -930,46 +1028,8 @@
   };
   function settingsOk(id) {
     if (id === 'editor') openEditor('settings');
-    else if (id === 'inputrow') openInputEditor();
     else openAppearance(id);
   }
-  V.inputrow = {
-    sheet: true,
-    norm: function (t) {
-      var n = (t.lifted ? t.lifted.order : S.c.inputs).length;
-      t.f.i = clamp(t.f.i || 0, 0, Math.max(0, n - 1));
-      if (t.lifted) t.f.part = 'name';
-    },
-    key: function (t, k) {
-      var order = t.lifted ? t.lifted.order : S.c.inputs, n = order.length, i = t.f.i, tmp;
-      if (t.renaming) return;
-      if (t.lifted) {
-        if (k === 'up' && i > 0) { tmp = order[i - 1]; order[i - 1] = order[i]; order[i] = tmp; t.f.i--; }
-        else if (k === 'down' && i < n - 1) { tmp = order[i + 1]; order[i + 1] = order[i]; order[i] = tmp; t.f.i++; }
-        else if (k === 'ok') placeInputOrder(t);
-        else if (k === 'back') { t.f.i = t.lifted.from; t.lifted = null; }
-        return;
-      }
-      if (k === 'back') { pop(); return; }
-      if (t.f.part === 'rename') {
-        if (k === 'left') t.f.part = 'name';
-        else if (k === 'ok') t.renaming = true;
-        return;
-      }
-      if (k === 'up' && i > 0) t.f.i--;
-      else if (k === 'down' && i < n - 1) t.f.i++;
-      else if (k === 'right') t.f.part = 'rename';
-      else if (k === 'ok') t.lifted = { from: i, order: order.slice() };
-    },
-    point: function (t, z, i) {
-      if (t.renaming) { if (z === 'save') commitInputName(t); return; }
-      if (t.lifted) { if (z === 'name' && i === t.f.i) this.key(t, 'ok'); return; }
-      if (z === 'name' || z === 'rename') { t.f.i = i; t.f.part = z; }
-      else if (z === 'head') { pop(); return; }
-      else return;
-      this.key(t, 'ok');
-    }
-  };
   var DETAIL_NAMES = { background: 'Background', layout: 'Layout', typography: 'Typography', focus: 'Focus', rotation: 'Rotation', samsung: 'Samsung', inputs: 'Inputs' };
   function choice(axis, value, disabled) {
     return { action: axis === 'mode' ? 'rotation.' + value : 'choice.' + axis + '.' + value, axis: axis, value: value, disabled: !!disabled,
@@ -990,7 +1050,8 @@
     if (t.group === 'layout') return [
       { id: 'layout', title: 'Layout', horizontal: true, items: options('layout', ['list', 'dock']) },
       { id: 'apps', title: 'App display', horizontal: true, items: options('apps', ['text', 'icons', 'both']) },
-      { id: 'controls', title: 'Home controls', horizontal: true, items: options('controls', ['text', 'icons', 'both']) }
+      { id: 'controls', title: 'Home controls', horizontal: true, items: options('controls', ['text', 'icons', 'both']) },
+      { id: 'shelf', title: 'Dock background', horizontal: true, items: options('shelf', ['glass', 'clear']) }
     ];
     if (t.group === 'typography') return [{ id: 'font', title: '', items: options('font', LOOK_VALUES.font) }];
     if (t.group === 'focus') return [
@@ -1199,11 +1260,16 @@
   }
 
   function renderInputRow(t) {
-    var ports = S.c.inputs || [], focus = t.id === 'home' && t.f.zone === 'inports', pitch = 248, width = 220;
-    var total = ports.length ? ports.length * pitch - (pitch - width) : 0, origin = Math.round((1920 - total) / 2), html = '';
+    var ports = S.c.inputs || [], focus = t.id === 'home' && t.f.zone === 'inports', list = S.c.layout === 'list';
+    var tileW = list ? 176 : 220, tileH = list ? 64 : 88, gap = 16, pitch = tileW + gap, html = '';
+    var total = ports.length ? (ports.length - 1) * pitch + tileW : 0;
+    var origin = list ? 140 : Math.round((1920 - total) / 2), top = list ? 76 : dockGeom(Math.max(1, S.c.home.length || 1)).y - tileH - 20;
+    inputRow.className = 'input-row' + (list ? ' is-list' : '');
+    inputRow.style.top = top + 'px';
+    inputRow.style.height = tileH + 'px';
     ports.forEach(function (port, i) {
-      var on = focus && (t.f.p || 0) === i;
-      html += '<button type="button" tabindex="-1" class="input-chip' + (on ? ' is-focus' : '') + '" style="width:' + width + 'px;transform:translate3d(' + (origin + i * pitch) + 'px,0,0)" data-z="inport" data-i="' + i + '" data-action="home.input.' + port + '" aria-label="' + esc(inputLabel(port)) + '"><span>' + esc(inputLabel(port)) + '</span></button>';
+      var on = focus && (t.f.p || 0) === i, label = inputLabel(port);
+      html += '<button type="button" tabindex="-1" class="input-tile' + (on ? ' is-focus' : '') + '" style="width:' + tileW + 'px;height:' + tileH + 'px;transform:translate3d(' + (origin + i * pitch) + 'px,0,0)" data-z="inport" data-i="' + i + '" data-action="home.input.' + port + '" aria-label="' + esc(label) + '"><span>' + esc(label) + '</span></button>';
     });
     setHTML(inputRow, html);
   }
@@ -1341,8 +1407,8 @@
     var a, body;
     if (it.kind === 'add') return '<span class="add">' + icon('plus') + '</span><span class="label">' + (full ? 'Home is full' : 'Add app') + '</span>';
     a = app(it.id);
-    body = S.c.apps === 'text' ? '' : appMark(a, S.c.apps === 'icons' ? 136 : 120, S.c.apps === 'icons' ? 88 : 72, S.c.apps === 'icons' ? 72 : 58);
-    return body + (S.c.apps === 'icons' ? '' : '<span class="label" style="font-size:' + dockLabelSize(a.id) + 'px;top:' + ((S.c.apps === 'text' ? 28 : 128) + fontShift('primary', dockLabelSize(a.id))) + 'px"><span class="label-ink">' + esc(a.name) + '</span></span>') + '<span class="nudge nudge-l">' + icon('left') + '</span><span class="nudge nudge-r">' + icon('right') + '</span>';
+    body = S.c.apps === 'text' ? '' : appMark(a, 120, 72, S.c.apps === 'icons' ? 56 : 58);
+    return body + (S.c.apps === 'icons' ? '' : '<span class="label" style="font-size:' + dockLabelSize(a.id) + 'px;top:' + ((S.c.apps === 'text' ? 32 : 104) + fontShift('primary', dockLabelSize(a.id))) + 'px"><span class="label-ink">' + esc(a.name) + '</span></span>') + '<span class="nudge nudge-l">' + icon('left') + '</span><span class="nudge nudge-r">' + icon('right') + '</span>';
   }
   /* A wide label can reach the shelf before its icon. Check the rendered icon box,
      including during the track's 180ms transition, so both disappear together. */
@@ -1370,7 +1436,7 @@
     var tileFocus = hs.zone === 'apps' || hs.zone === 'tiles', tileSel = hs.zone === 'util' || hs.zone === 'act' || hs.zone === 'ctl' || hs.zone === 'preview';
     var focusItem = items[anchor], s, ax, label, width;
 
-    dock.className = 'dock' + (empty ? ' is-empty' : '');
+    dock.className = 'dock' + (empty ? ' is-empty' : '') + (S.c.shelf === 'clear' ? ' is-clear' : '');
     dock.style.left = g.x + 'px'; dock.style.top = g.y + 'px'; dock.style.width = g.w + 'px'; dock.style.height = g.h + 'px';
     dock.style.setProperty('--tile-w', g.tw + 'px'); dock.style.setProperty('--tile-h', g.th + 'px'); dock.style.setProperty('--dock-h', g.h + 'px');
     dock.style.setProperty('--nudge-top', ((g.th - 48) / 2) + 'px');
@@ -1670,12 +1736,13 @@
     },
     editor: function () {
       return '<h2 class="s-title">Apps on Home</h2><p class="s-sub" data-slot="sub"></p><div class="s-head" data-slot="head"></div>'
-        + '<p class="s-label z-home" data-slot="lh"></p><p class="s-label z-other">Not on Home</p>'
-        + '<div class="ed-home" data-slot="home"></div><div class="ed-order-break" data-slot="break">Then scroll</div><div class="ed-other-view" data-slot="ov"><div class="ed-other" data-slot="other"></div></div><div class="ed-origin" data-slot="origin"></div>'
-        + '<div class="row-cue editor-before" data-slot="otherBefore" aria-hidden="true">' + icon('up') + '</div><div class="row-cue editor-after" data-slot="otherAfter" aria-hidden="true">' + icon('down') + '</div>';
+        + '<p class="s-label z-home" data-slot="lh"></p><p class="s-label z-other" data-slot="rh">Not on Home</p>'
+        + '<div class="ed-home"><div class="ed-home-in" data-slot="home"></div></div><div class="ed-order-break" data-slot="break">Then scroll</div>'
+        + '<div class="ed-other-view" data-slot="ov"><div class="ed-other" data-slot="other"></div><div class="kb-panel" data-slot="keys" hidden></div></div><div class="ed-origin" data-slot="origin"></div>'
+        + '<div class="row-cue editor-before" data-slot="otherBefore" aria-hidden="true">' + icon('up') + '</div><div class="row-cue editor-after" data-slot="otherAfter" aria-hidden="true">' + icon('down') + '</div>'
+        + '<div class="row-cue home-before" data-slot="homeBefore" aria-hidden="true">' + icon('up') + '</div><div class="row-cue home-after" data-slot="homeAfter" aria-hidden="true">' + icon('down') + '</div>';
     },
     settings: function () { return '<h2 class="s-title">Settings</h2><div class="settings-overview" data-slot="list"></div><p class="settings-overview-hint"><span class="remote-key">OK</span><span>Open selected group</span></p>'; },
-    inputrow: function () { return '<h2 class="s-title">Input row</h2><p class="s-sub" data-slot="sub"></p><div class="s-head" data-slot="head"></div><div class="input-editor" data-slot="list"></div>'; },
     message: function (t) {
       var m = messageContent(t);
       return '<h2 class="msg-title">' + esc(m.title) + '</h2><p class="msg-line">' + esc(m.line) + '</p><p class="msg-note">' + esc(m.note) + '</p><div class="msg-acts" data-slot="acts"></div>';
@@ -1708,18 +1775,56 @@
       el.after.className = 'row-cue grid-after' + (rows - t.top > vis ? ' is-on' : '');
     },
     editor: function (t, el) {
-      var f = t.f, H = t.lifted ? t.lifted.order : S.c.home, O = otherGroups(), list = O.recent.concat(O.rest), full = S.c.home.length >= CAP;
-      var entries = [], ys = [], y = 0, yf, minTop, maxTop = 0, rowEnd, before = false, afterRows = false;
+      var f = t.f, H = editorOrder(t), ports = inputOrder(t), O = otherGroups(), list = O.recent.concat(O.rest), full = S.c.home.length >= CAP;
+      var entries = [], ys = [], y = 0, yf, minTop, maxTop = 0, rowEnd, before = false, afterRows = false, focusY = 0, contentEnd, moveLine = '', originY;
       var hint = catalog.error ? catalog.error : catalog.loading ? 'Loading installed apps…' : f.zone === 'head' && f.h === 0 ? undoCaption() : f.zone === 'home' && f.part === 'remove' ? (H.length <= 1 ? LAST : app(H[f.i]).name + ' stays installed.') : '';
-      setHTML(el.sub, editStatus(hint, t.lifted ? 'Moving ' + app(t.lifted.id).name + '. OK places it, Back puts it back.' : ''));
+      if (t.lifted && t.lifted.kind === 'input') moveLine = 'Moving ' + inputLabel(t.lifted.port) + '. OK places it, Back puts it back.';
+      else if (t.lifted) moveLine = 'Moving ' + app(t.lifted.id).name + '. OK places it, Back puts it back.';
+      else if (t.renaming) moveLine = 'Done saves this launcher name. Cancel discards it.';
+      if (f.zone === 'home' || (t.lifted && t.lifted.kind !== 'input')) focusY = editorHomeY(f.i);
+      else if (f.zone === 'inputs' || f.zone === 'keys' || (t.lifted && t.lifted.kind === 'input')) focusY = editorInputOrigin(H.length) + ED_SEP + f.p * ED_ROW;
+      if (f.zone === 'home' || f.zone === 'inputs' || f.zone === 'keys' || t.lifted) {
+        if (focusY < (t.homeTop || 0)) t.homeTop = focusY;
+        if (focusY + 96 > (t.homeTop || 0) + ED_VIEW) t.homeTop = focusY + 96 - ED_VIEW;
+      }
+      contentEnd = ports.length ? editorInputOrigin(H.length) + ED_SEP + ports.length * ED_ROW : (H.length ? editorHomeY(H.length - 1) + ED_ROW : 0);
+      t.homeTop = clamp(t.homeTop || 0, 0, Math.max(0, contentEnd - ED_VIEW));
+      setHTML(el.sub, editStatus(hint, moveLine));
       setHTML(el.head, headButtons([['undo', 'Undo', S.undo.length ? '' : 'is-idle', 'undo'], ['done', 'Done', '', 'check']], f.zone === 'head' ? f.h : -1, 'editor'));
       el.head.className = 's-head' + (f.zone === 'head' ? ' is-awake' : '');
-      setHTML(el.lh, 'On Home <span class="s-count">' + S.c.home.length + ' of ' + CAP + '</span>');
-      el['break'].className = 'ed-order-break' + (H.length > editorCut() ? ' is-on' : '');
+      setHTML(el.lh, 'Apps <span class="s-count">' + S.c.home.length + ' of ' + CAP + '</span>');
+      setHTML(el.rh, t.renaming ? 'Launcher name' : 'Not on Home');
+      el.home.parentNode.className = 'ed-home' + (t.homeTop + ED_VIEW < contentEnd - 1 ? ' is-more' : '');
+      el.home.style.transform = 'translate3d(0,' + (-t.homeTop) + 'px,0)';
+      el['break'].className = 'ed-order-break' + (H.length > editorCut() && t.homeTop < 8 ? ' is-on' : '');
       el['break'].style.top = (264 + editorCut() * ED_ROW) + 'px';
+      el.homeBefore.className = 'row-cue home-before' + (t.homeTop > 0 ? ' is-on' : '');
+      el.homeAfter.className = 'row-cue home-after' + (t.homeTop + ED_VIEW < contentEnd - 1 ? ' is-on' : '');
 
-      keyed(el.home, H.map(function (id) { return { key: id, id: id }; }), function (row, it, i) {
-        var a = app(it.id), here = f.zone === 'home' && i === f.i, lifted = !!t.lifted && i === f.i;
+      keyed(el.home, H.map(function (id) { return { key: id, id: id }; }).concat(ports.length ? [{ key: 'inputs-label', sep: 'Inputs' }].concat(ports.map(function (port) { return { key: 'in:' + port, port: port }; })) : []), function (row, it) {
+        var a, here, lifted, pi, i;
+        if (it.sep) {
+          setContent(row, 'sep|Inputs', function () { return 'Inputs'; });
+          row.className = 'eo-sep';
+          row.style.transform = 'translate3d(0,' + editorInputOrigin(H.length) + 'px,0)';
+          row.removeAttribute('data-action');
+          return;
+        }
+        if (it.port) {
+          pi = ports.indexOf(it.port); here = f.zone === 'inputs' && pi === f.p; lifted = !!(t.lifted && t.lifted.kind === 'input' && pi === f.p);
+          setContent(row, 'in|' + it.port + '|' + inputLabel(it.port), function () { return '<div class="er-name" role="button"><span class="panel-content"><span class="er-num"></span><span class="er-text">' + esc(inputLabel(it.port)) + '</span><span class="er-move">' + icon('updown') + '</span></span></div><div class="er-rm" role="button"><span>Rename</span></div>'; });
+          row.className = 'er' + (here ? ' is-active' : '') + (lifted ? ' is-lifted' : '');
+          row.style.transform = 'translate3d(' + (lifted ? 16 : 0) + 'px,' + (editorInputOrigin(H.length) + ED_SEP + pi * ED_ROW) + 'px,0)';
+          row.querySelector('.er-num').textContent = String(pi + 1);
+          row.firstChild.className = 'er-name' + (here && (f.part === 'name' || lifted) ? ' is-focus' : '');
+          row.firstChild.setAttribute('aria-label', inputLabel(it.port));
+          row.lastChild.className = 'er-rm' + (here && f.part === 'rename' && !lifted ? ' is-focus' : '');
+          row.lastChild.firstChild.textContent = 'Rename';
+          attrs(row.firstChild, 'iname', pi, 'editor.input.move.' + it.port);
+          attrs(row.lastChild, 'irename', pi, 'editor.input.rename.' + it.port);
+          return;
+        }
+        i = H.indexOf(it.id); a = app(it.id); here = f.zone === 'home' && i === f.i; lifted = !!(t.lifted && t.lifted.kind !== 'input' && i === f.i);
         setContent(row, it.id, function () { return '<div class="er-name" role="button"><span class="panel-content"><span class="er-num"></span>' + smallMark(a) + '<span class="er-text">' + esc(a.name) + '</span><span class="er-move">' + icon('updown') + '</span></span></div><div class="er-rm" role="button"><span></span></div>'; });
         row.className = 'er' + (here ? ' is-active' : '') + (lifted ? ' is-lifted' : '');
         row.style.transform = 'translate3d(' + (lifted ? 16 : 0) + 'px,' + editorHomeY(i) + 'px,0)';
@@ -1730,8 +1835,9 @@
         attrs(row.firstChild, 'name', i, 'editor.move.' + it.id);
         attrs(row.lastChild, 'remove', i, 'editor.remove.' + it.id);
       });
-      el.origin.className = 'ed-origin' + (t.lifted && t.lifted.from !== f.i ? ' is-on' : '');
-      if (t.lifted) el.origin.style.transform = 'translate3d(0,' + (264 + editorHomeY(t.lifted.from) + 16) + 'px,0)';
+      originY = t.lifted ? (t.lifted.kind === 'input' ? editorInputOrigin(S.c.home.length) + ED_SEP + t.lifted.from * ED_ROW : editorHomeY(t.lifted.from)) : 0;
+      el.origin.className = 'ed-origin' + (t.lifted && t.lifted.from !== (t.lifted.kind === 'input' ? f.p : f.i) ? ' is-on' : '');
+      if (t.lifted) el.origin.style.transform = 'translate3d(0,' + (264 + originY - t.homeTop + 16) + 'px,0)';
 
       if (O.recent.length) { entries.push({ key: 'sep-recent', sep: 'Recently removed', y: y }); y += ED_SEP; }
       O.recent.forEach(function (id) { entries.push({ key: id, id: id, y: y }); ys.push(y); y += ED_ROW; });
@@ -1749,6 +1855,7 @@
       t.top = clamp(t.top, 0, maxTop);
       keyed(el.other, entries, function (row, it) {
         var j, focus, a;
+        if (t.renaming) { row.style.visibility = 'hidden'; return; }
         row.style.transform = 'translate3d(0,' + it.y + 'px,0)';
         rowEnd = it.y + (it.sep ? ED_SEP : 72);
         row.style.visibility = it.y >= t.top && rowEnd <= t.top + ED_VIEW ? 'visible' : 'hidden';
@@ -1762,32 +1869,17 @@
         attrs(row, 'other', j, 'editor.add.' + it.id);
       });
       el.other.style.transform = 'translate3d(0,' + (-t.top) + 'px,0)';
+      el.other.style.visibility = t.renaming ? 'hidden' : '';
+      el.keys.hidden = !t.renaming;
+      if (t.renaming) setHTML(el.keys, kbPanelHtml(t));
       el.ov.className = 'ed-other-view';
-      el.otherBefore.className = 'row-cue editor-before' + (before ? ' is-on' : '');
-      el.otherAfter.className = 'row-cue editor-after' + (afterRows ? ' is-on' : '');
+      el.otherBefore.className = 'row-cue editor-before' + (!t.renaming && before ? ' is-on' : '');
+      el.otherAfter.className = 'row-cue editor-after' + (!t.renaming && afterRows ? ' is-on' : '');
     },
     settings: function (t, el) {
       var html = '';
       settingsRows().forEach(function (r) {
         html += '<button type="button" tabindex="-1" class="settings-group' + (r.id === t.f.id ? ' is-focus' : '') + '" data-z="row" data-i="0" data-id="' + r.id + '" data-action="settings.' + (r.id === 'editor' ? 'editor' : 'group.' + r.id) + '"><span class="settings-group-copy"><span class="settings-group-name">' + esc(r.label) + '</span><span class="settings-group-value">' + esc(r.value) + '</span></span>' + icon('right') + '</button>';
-      });
-      setHTML(el.list, html);
-    },
-    inputrow: function (t, el) {
-      var order = t.lifted ? t.lifted.order : S.c.inputs, html = '', port = order[t.f.i], field;
-      setHTML(el.sub, esc(t.renaming ? 'Type a launcher name. The TV source name stays unchanged.' : 'OK picks up a row to move. Right renames that launcher label only.'));
-      setHTML(el.head, '<button type="button" tabindex="-1" class="btn" data-z="head" data-i="0" data-action="inputrow.done"><span>Done</span></button>');
-      if (t.renaming) {
-        setHTML(el.list, '<label class="input-rename">Launcher name<input id="inputNameField" maxlength="24" value="' + esc(inputLabel(port)) + '"></label><button type="button" tabindex="-1" class="btn" data-z="save" data-i="0" data-action="inputrow.save"><span>Save name</span></button>');
-        field = document.getElementById('inputNameField');
-        if (field && document.activeElement !== field) { field.focus(); field.select(); }
-        return;
-      }
-      order.forEach(function (item, i) {
-        var here = i === t.f.i, lifted = !!t.lifted && here;
-        html += '<div class="ir-row' + (here ? ' is-active' : '') + (lifted ? ' is-lifted' : '') + '">'
-          + '<button type="button" tabindex="-1" class="ir-name' + (here && t.f.part !== 'rename' ? ' is-focus' : '') + '" data-z="name" data-i="' + i + '" data-action="inputrow.move.' + item + '"><span>' + esc(inputLabel(item)) + '</span></button>'
-          + '<button type="button" tabindex="-1" class="ir-rename' + (here && t.f.part === 'rename' ? ' is-focus' : '') + '" data-z="rename" data-i="' + i + '" data-action="inputrow.rename.' + item + '"><span>Rename</span></button></div>';
       });
       setHTML(el.list, html);
     },
@@ -2021,14 +2113,11 @@
   });
   var heldKeys = {};
   document.addEventListener('keydown', function (ev) {
-    var code = ev.keyCode, k = KEYS[code], naming = document.activeElement && document.activeElement.id === 'inputNameField';
-    if (naming) {
-      if (code === 13 || code === 27 || code === 10009) {
-        ev.preventDefault();
-        if (top().id === 'inputrow') commitInputName(top());
-        render();
-      }
-      return;
+    var code = ev.keyCode, k = KEYS[code], typing = top(), ch;
+    if (typing && typing.id === 'editor' && typing.renaming) {
+      if (code === 8) { ev.preventDefault(); typing.kbText = (typing.kbText || '').slice(0, -1); render(); return; }
+      ch = ev.key;
+      if (ch && ch.length === 1 && !ev.metaKey && !ev.ctrlKey && !ev.altKey) { ev.preventDefault(); kbInsert(typing, ch); render(); return; }
     }
     if (code === 9) { ev.preventDefault(); return; }
     if (!k || ev.metaKey || ev.ctrlKey || ev.altKey) return;
@@ -2045,6 +2134,7 @@
     else {
       release();
       if (S.c.bg === 'photo' && !S.pending && !S.previewBundle && (!committedBundle || S.bundleKey !== bundleKey(S.c))) setLook({}, { transient: true, startup: true });
+      startupCatalog();
       refreshInputsOnReturn(); after(); updateClock(); focusStage();
     }
   });
@@ -2080,9 +2170,15 @@
   QA.activate = function (action) { return activate(action) ? QA.state() : null; };
   QA.actions = function () { var view = isSettingsDetail(top()) ? appearanceEl : sheetEl.hidden ? homeEl : sheetEl; return Array.prototype.filter.call(view.querySelectorAll('[data-action]'), renderedAction).map(function (el) { return el.getAttribute('data-action'); }); };
 
+  function startupCatalog() {
+    if (document.hidden || catalog.loaded || catalog.loading) return;
+    refreshCatalog();
+  }
+
   /* ---------- Start ---------- */
   cueL.innerHTML = icon('left'); cueR.innerHTML = icon('right');
   initialise();
   setLook({}, { transient: true, startup: true });
   norm(); render(); fit(); focusStage(); updateClock(); syncRotation();
+  startupCatalog();
 })();

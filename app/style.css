@@ -108,12 +108,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000}
 .tile.is-outside-icon{opacity:0;pointer-events:none}
 .at-arrange .tile:not(.is-focus):not(.is-lifted){background:rgba(255,255,255,.08)}
 .mark{position:relative;display:block;flex:none}
-.mark img,.mark .mk{position:absolute;max-width:none}.mark .mk{display:block;background:currentColor;-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}.mark.is-bad>*{visibility:hidden}
+.mark img,.mark .mk{position:absolute;max-width:none}.mark img{object-fit:contain}.mark .mk{display:block;background:currentColor;-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}.mark.is-bad>*{visibility:hidden}
 .monogram{display:flex;align-items:center;justify-content:center;font-weight:600;letter-spacing:0;color:inherit}
 .monogram span{position:relative;width:1.65em;height:1.65em;display:flex;align-items:center;justify-content:center;border-radius:.4em}.monogram span::after{content:"";position:absolute;top:0;right:0;bottom:0;left:0;border:2px solid currentColor;border-radius:inherit;opacity:.38}
-.native-icon img{position:absolute;top:0;right:0;bottom:0;left:0;width:100%;height:100%;object-fit:contain}
+.native-icon img{position:absolute;top:0;right:0;bottom:0;left:0;width:100%;height:100%;object-fit:contain;object-position:center}
 .native-icon.has-native-icon>span{visibility:hidden}
-.tile .mark{position:absolute;left:84px;top:34px;opacity:.84;transition:opacity 160ms linear,transform var(--t) var(--ease)}
+.tile .mark{position:absolute;left:96px;top:24px;opacity:.84;transition:opacity 160ms linear,transform var(--t) var(--ease)}
 .tile .label{position:absolute;left:4px;right:4px;top:128px;text-align:center;font-size:36px;line-height:44px;letter-spacing:-.8px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.84;transition:opacity 160ms linear}
 .tile .t-name{position:absolute;left:12px;right:12px;top:72px;text-align:center;font-size:40px;line-height:56px;letter-spacing:-1px;font-weight:600;white-space:nowrap;overflow:hidden;opacity:.84;transition:opacity 160ms linear}
 .tile.is-focus .mark,.tile.is-focus .label,.tile.is-focus .t-name,.tile.is-lifted .mark,.tile.is-lifted .label,.tile.is-lifted .t-name{opacity:1}
@@ -145,20 +145,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000}
 .dock-action.is-focus{background:var(--solid);color:var(--solid-ink)}
 .dock-action>span{display:block;max-width:100%;padding:0 20px;overflow:hidden;text-overflow:ellipsis}
 .l-list .dock,.l-list .cue,.l-list .dock-action{display:none}
-.input-row{position:absolute;left:0;top:1008px;width:1920px;height:56px;z-index:4}
-.input-chip{position:absolute;top:0;height:56px;border-radius:28px;background:rgba(255,255,255,.12);color:#f6f1e7;font-size:28px;font-weight:500;letter-spacing:-.3px}
-.input-chip.is-focus{background:var(--solid);color:var(--solid-ink)}
-.input-chip span{display:block;padding:0 16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:56px;text-align:center}
-.input-editor{position:absolute;left:140px;top:250px;width:1100px}
-.ir-row{position:relative;height:84px;margin-bottom:12px}
-.ir-name,.ir-rename{height:72px;border-radius:24px;font-size:32px;font-weight:500;color:var(--ink);background:rgba(255,255,255,.08)}
-.ir-name{width:700px;text-align:left;padding:0 28px}
-.ir-rename{position:absolute;left:724px;top:0;width:240px}
-.ir-name.is-focus,.ir-rename.is-focus{background:var(--solid);color:var(--solid-ink)}
-.ir-row.is-lifted .ir-name{transform:translateX(16px)}
-.input-rename{display:block;font-size:28px;font-weight:500}
-.input-rename input{display:block;width:700px;height:72px;margin-top:12px;padding:0 28px;border:0;border-radius:24px;background:rgba(255,255,255,.12);color:var(--ink);font:inherit}
-.input-editor .btn{margin-top:24px}
+.dock.is-clear .mat{visibility:hidden}
+.input-row{position:absolute;left:0;width:1920px;height:88px;z-index:4}
+.input-tile{position:absolute;top:0;height:88px;border-radius:24px;background:rgba(8,12,14,.5);color:#f6f1e7;box-shadow:inset 0 1px 0 rgba(255,255,255,.22)}
+.input-tile.is-focus{background:rgba(246,241,231,.92);color:#1d1a16;box-shadow:none}
+.input-tile span{display:block;padding:0 16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:88px;text-align:center;font-size:30px;font-weight:500;letter-spacing:-.5px}
+.input-row.is-list{height:64px}
+.input-row.is-list .input-tile{height:64px;border-radius:20px}
+.input-row.is-list .input-tile span{line-height:64px;font-size:26px}
 
 /* Shared whole-row cues for the app library and two-column editor. */
 .row-cue{position:absolute;width:40px;height:40px;display:none;align-items:center;justify-content:center;color:var(--mute);pointer-events:none}
@@ -329,7 +323,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000}
 /* B: two-zone Home editor */
 .z-home,.z-other{top:216px}
 .z-other{left:1068px}
-.ed-home{position:absolute;left:112px;top:264px;width:880px;height:752px}
+.ed-home{position:absolute;left:112px;top:264px;width:900px;height:752px;overflow:hidden}
+.ed-home.is-more{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 36px),transparent)}
+.ed-home-in{position:absolute;left:0;top:0;width:896px;transition:transform var(--t) var(--ease)}
 .er{position:absolute;left:0;top:0;width:880px;height:72px;display:flex;transition:transform var(--t) var(--ease)}
 .er-name{flex:1;min-width:0;display:flex;align-items:center;padding:0 24px 0 16px;border-radius:24px;font-size:34px;font-weight:500;letter-spacing:-.5px;white-space:nowrap;transition:background-color 140ms linear}
 .er-num{width:36px;text-align:right;font-size:28px;color:var(--mute);font-variant-numeric:tabular-nums}
@@ -361,8 +357,15 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000}
 .ed-order-break.is-on{display:flex}
 .ed-order-break::after{content:"";height:1px;flex:1;background:var(--line)}
 .editor-before,.editor-after{left:1408px;width:32px}
-.editor-before{top:264px}
-.editor-after{top:976px}
+.editor-before,.home-before{top:264px}
+.editor-after,.home-after{top:976px}
+.home-before,.home-after{left:64px;width:32px}
+.kb-panel{position:absolute;left:0;top:0;z-index:2;width:768px;height:752px;background:#14181a}
+.kb-name{position:absolute;left:16px;right:16px;top:0;height:72px;line-height:72px;text-align:center;font-size:40px;font-weight:600;letter-spacing:-.8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kb-grid{position:absolute;left:8px;right:8px;top:84px;bottom:96px;overflow:hidden;-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
+.kb-foot{position:absolute;left:8px;right:8px;bottom:16px;height:64px}
+.kb-key{position:absolute;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.08);color:var(--ink);font-size:26px;font-weight:600}
+.kb-key.is-focus{background:var(--solid);color:var(--solid-ink)}
 
 /* The focused control carries its own persistent retry state. */
 .focus-status{position:absolute;z-index:5;height:28px;display:none;align-items:center;justify-content:center;text-align:center;font-size:22px;line-height:28px;font-weight:600;letter-spacing:-.2px;color:var(--warn);white-space:nowrap;pointer-events:none}
@@ -565,12 +568,13 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000}
 
 /* Saved display choices alter content, not app identity or editing state. */
 .stage.is-reflow *{transition:none!important;animation:none!important}
-.dock .tile,.dock .plate{width:var(--tile-w);height:var(--tile-h)}
+.dock .tile,.dock .plate{width:var(--tile-w);height:var(--tile-h);border-radius:28px}
+.a-icons .dock .tile,.a-icons .dock .plate{border-radius:24px}
 .dock .track{height:var(--dock-h)}
 .dock .nudge{top:var(--nudge-top)}
 .a-text .tile .label{left:12px;right:12px;top:28px;font-size:40px;line-height:48px;font-weight:600}
 .a-text .label-ink{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:top}
-.a-icons .tile .mark{left:20px;top:28px}
+.a-icons .tile .mark{left:60px;top:32px}
 .a-text .ph-name,.a-text .ph-list.is-compact .ph-name{left:28px}
 .a-icons .ph-group .mark{top:20px}
 .a-icons .ph-list.is-compact .ph-group .mark{top:12px}

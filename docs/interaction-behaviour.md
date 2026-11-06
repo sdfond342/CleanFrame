@@ -2,8 +2,8 @@
 
 ## Home
 
-- Dock: Left/Right scrolls the apps without wrapping. Up enters the top-right controls, starting with All apps or the last selected control. Left/Right moves between All apps and Settings. Down enters the separate HDMI row. Back from the app row opens a choice to stay or open Samsung Home. The clock is at the top left.
-- List: Up/Down scrolls the apps without wrapping. Right enters the bottom-right controls, aligned with the clock above. Up/Down moves between All apps and Settings. Down from the last app enters the separate HDMI row. Left or Back returns to the selected app. The list fades at both ends as it scrolls.
+- Dock: Left/Right scrolls the apps without wrapping. Up enters the separate HDMI row above the apps, then another Up enters the top-right controls, starting with All apps or the last selected control. Left/Right moves between All apps and Settings. Down from the HDMI row returns to the apps. Back from the app row opens a choice to stay or open Samsung Home. The clock is at the top left.
+- List: Up/Down scrolls the apps without wrapping. Up from the first app enters the separate HDMI row above the list. Down from that row returns to the apps. Right enters the bottom-right controls, aligned with the clock above. Up/Down moves between All apps and Settings. Left or Back returns to the selected app. The list fades at both ends as it scrolls.
 - OK opens the selected item. Focus alone never launches an app.
 - Icons-only apps and controls reveal their names when focused. App presentation and control presentation are independent.
 - Back from the app list or Dock opens a choice to stay or open Samsung Home.
@@ -17,7 +17,7 @@ Settings opens a grouped overview: Background, Layout, Typography, Focus, Apps o
 | Group | Choices |
 | --- | --- |
 | Background | Photo, Light, Dark; Wallpaper and Rotation when Photo is active |
-| Layout | List or Dock; independent Text, Icons or Both choices for apps and Home controls |
+| Layout | List or Dock; independent Text, Icons or Both choices for apps and Home controls; Dock background Glass or Clear |
 | Typography | Manrope, Neue Montreal, Mori, Pangram Sans, Geist and Newsreader, when available |
 | Focus | Type or Glass; Soft, Frost or Clear tint material |
 | Apps on Home | Membership and arrangement editor |
@@ -43,10 +43,11 @@ The five-column grid scrolls with remote focus. OK launches an app; its On Home 
 
 ## Apps on Home
 
-Open the editor from Settings or All apps. On Home shows the current order on the left. Not on Home shows Recently removed first, followed by other installed apps on the right. Home holds one to nine apps.
+Open the editor from Settings or All apps. Apps shows the current order on the left, followed by the HDMI row in the same list. Not on Home shows Recently removed first, followed by other installed apps on the right. Home holds one to nine apps. The HDMI ports stay the four source numbers; only their order and launcher labels change.
 
-- Reorder: OK on an app name picks it up. Up/Down moves it. OK places it and saves the order. Back puts an unplaced app back without saving that move.
+- Reorder: OK on a name picks it up. Up/Down moves it inside its own group. OK places it and saves the order. Back puts an unplaced row back without saving that move.
 - Remove: Right from an app name reaches Remove from Home. OK saves the removal and moves focus to the same app in Recently removed. The app stays installed.
+- Rename: Right from an HDMI name reaches Rename. OK opens the on-screen keyboard. Done saves that launcher label immediately. Cancel or Back discards only the unfinished name. The television source name is unchanged.
 - Add: OK on an app in Not on Home adds it and saves. A recently removed app returns to its previous position within the editing session; another app is added at the end. Focus follows the app to its Remove from Home control, so another OK can reverse the addition.
 - Undo reverses a completed addition, removal or reorder from the current editing session. Done or Back closes the editor and keeps completed changes. Undo history ends when the editor closes.
 
@@ -68,7 +69,7 @@ Installed-app discovery allows up to 20 seconds for large TV catalogues; launch 
 
 ## HDMI inputs
 
-The launcher has its own HDMI row, separate from the app row. Its initial launcher labels are HDMI1, HDMI2, Kodi and HDMI4, for public source numbers 1, 2, 3 and 4. Those labels are stored with the launcher and do not rename the television source. Settings → Input row reorders and renames them. OK on a home-row chip asks the public TV window API for that port number only after the TV reports it; a missing port stays an error. Settings → Samsung → Inputs still reads the live connected and disconnected records, including sleeping devices that may be listed as disconnected. It does not invent ports beyond what the TV returns. Missing APIs, denied access and discovery failure produce an unavailable/error state. The active source comes from the synchronous `tvwindow.getSource()` return value. Switching on this set still needs a device test.
+The launcher has its own HDMI row above the app row. Its initial launcher labels are HDMI1, HDMI2, Kodi and HDMI4, for public source numbers 1, 2, 3 and 4. Those labels are stored with the launcher and do not rename the television source. Apps on Home reorders and renames them with the same move controls as the apps. OK on a home-row tile asks the public TV window API for that port number only after the TV reports it; a missing port stays an error. Settings → Samsung → Inputs still reads the live connected and disconnected records, including sleeping devices that may be listed as disconnected. It does not invent ports beyond what the TV returns. Missing APIs, denied access and discovery failure produce an unavailable/error state. The active source comes from the synchronous `tvwindow.getSource()` return value. Switching on this set still needs a device test.
 
 Up/Down selects an input. OK requests that exact source; Back returns to Samsung Settings. Retry after a failed load rereads the available sources. A routing error remains an error, and a failed handoff leaves the launcher usable. Timed-out or cancelled requests cannot start a later routing or viewer action; a native request already sent to the TV may itself be uncancellable.
 

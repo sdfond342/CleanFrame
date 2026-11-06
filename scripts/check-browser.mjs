@@ -118,7 +118,7 @@ async function page(options = {}, setup) {
   current = await preview.browser.newPage({ viewport: { width: 1920, height: 1080 } });
   const owner = current;
   current.setDefaultTimeout(10000);
-  const expected = [];
+  const expected = Array.isArray(options.expectedFailures) ? options.expectedFailures.slice() : [];
   current.__expectedFailures = expected;
   current.on('pageerror', error => report.pageErrors.push({ section, error: error.message }));
   current.on('response', response => { if (response.status() >= 400 && !expected.some(s => response.url().includes(s))) report.pageErrors.push({ section, status: response.status(), url: response.url() }); });
@@ -324,6 +324,7 @@ try {
         const labels = await current.locator(layout === 'dock' ? '.tile-content' : '.ph-name').evaluateAll(elements => elements.filter(e => e.getClientRects().length).map(e => e.getBoundingClientRect().width));
         check(layout + ' labels retain width at ' + viewport.width, labels.length > 0 && labels.every(width => width > 0), labels);
         await nav(layout === 'dock' ? 'up' : 'right');
+        if (layout === 'dock') await nav('up');
         await current.waitForTimeout(240);
         check('Utility focus and rounded lens align at ' + viewport.width + ' in ' + layout, await current.evaluate(() => {
           const button = document.querySelector('.u.is-focus'), lens = document.querySelector('.ut-lens.is-current');
@@ -348,6 +349,7 @@ try {
         await look({ bg: 'photo', layout, controls, focus: 'glass', font: 'manrope' }); await scene('home');
         if ((await call('where')).zone === 'util') await nav('back');
         await nav(layout === 'dock' ? 'up' : 'right');
+        if (layout === 'dock') await nav('up');
         await nav(...Array(3).fill(layout === 'dock' ? 'left' : 'up'));
         await current.waitForTimeout(180);
         const spacing = await current.evaluate(({ layout, controls }) => {
@@ -402,7 +404,7 @@ try {
         const scale = document.getElementById('stage').getBoundingClientRect().width / 1920;
         return elements.map(e => (e.querySelector('.ico').getBoundingClientRect().left - e.querySelector('.settings-group-copy').getBoundingClientRect().right) / scale);
       });
-      check('Settings group arrows stay separate from their copy at ' + width, groups.length === 7 && groups.every(gap => gap >= 31.5), groups);
+      check('Settings group arrows stay separate from their copy at ' + width, groups.length === 6 && groups.every(gap => gap >= 31.5), groups);
       await wallpaper();
       const caption = await current.locator('.wallpaper-preview-name').evaluate(e => {
         const scale = document.getElementById('stage').getBoundingClientRect().width / 1920;
@@ -477,11 +479,18 @@ try {
   });
   await run('Separate HDMI row names, order and launcher-only rename', async () => {
     await page();
-    const chips = () => current.locator('#inputRow .input-chip').allTextContents();
-    check('Input row starts HDMI1, HDMI2, Kodi, HDMI4', (await chips()).join(',') === 'HDMI1,HDMI2,Kodi,HDMI4');
-    check('Input chips stay outside the app dock', await current.evaluate(() => [...document.querySelectorAll('#inputRow .input-chip')].length === 4 && [...document.querySelectorAll('#dock .input-chip')].length === 0));
-    await nav('down');
-    check('Down from the app row enters HDMI1', (await call('where')).focusAction === 'home.input.1' && (await call('where')).focusCount === 1);
+    const tiles = () => current.locator('#inputRow .input-tile').allTextContents();
+    const gap = await current.evaluate(() => {
+      const row = document.getElementById('inputRow').getBoundingClientRect();
+      const dock = document.getElementById('dock').getBoundingClientRect();
+      const tile = document.querySelector('#dock .tile');
+      const box = tile.getBoundingClientRect();
+      return { above: row.bottom <= dock.top + 1, separate: document.querySelectorAll('#dock .input-tile').length === 0, ratio: box.width / box.height, radius: parseFloat(getComputedStyle(tile).borderRadius) };
+    });
+    check('Input row starts HDMI1, HDMI2, Kodi, HDMI4', (await tiles()).join(',') === 'HDMI1,HDMI2,Kodi,HDMI4');
+    check('Input row sits above widescreen app tiles', gap.above && gap.separate && gap.ratio > 1.6 && gap.radius >= 20, gap);
+    await nav('up');
+    check('Up from the app row enters HDMI1', (await call('where')).focusAction === 'home.input.1' && (await call('where')).focusCount === 1);
     await nav('right', 'right');
     check('The third input is the launcher name Kodi', (await call('where')).focusAction === 'home.input.3' && (await call('where')).focus === 'Kodi');
     const before = (await state()).writes;
@@ -489,20 +498,70 @@ try {
     await current.waitForFunction(() => __tv.calls.some(c => c.method === 'setSource'));
     check('Kodi asks the public API for port 3', await current.evaluate(() => __tv.calls.at(-2).method === 'setSource' && __tv.calls.at(-2).number === 3 && __tv.calls.at(-1).id === 'org.tizen.tv-viewer'));
     await current.evaluate(() => window.dispatchEvent(new Event('focus')));
-    await scene('settings'); await act('settings.group.inputrow');
-    await act('inputrow.move.1'); await nav('down', 'ok');
+    await editor();
+    check('Apps on Home keeps app move controls and has no separate input screen', await current.evaluate(() => !!document.querySelector('[data-action="editor.move.stremio"]') && !!document.querySelector('[data-action="editor.input.move.1"]') && !document.querySelector('[data-action^="inputrow."]')));
+    await act('editor.input.move.1'); await nav('down', 'ok');
     check('Input reorder persists apart from the app row', (await stored()).inputs.join(',') === '2,1,3,4' && (await stored()).dock[0] === 'stremio');
-    await act('inputrow.rename.3');
-    await current.locator('#inputNameField').fill('Cinema');
-    await act('inputrow.save');
-    check('Rename is launcher-only and keeps port 3', (await stored()).inputNames['3'] === 'Cinema' && (await stored()).inputs.includes(3));
-    await act('inputrow.done'); await scene('home');
-    check('Home row shows the saved launcher label', (await chips()).join(',') === 'HDMI2,HDMI1,Cinema,HDMI4');
+    const moved = (await stored()).inputs.join(',');
+    await act('editor.input.move.2'); await nav('down');
+    check('Unfinished input move does not write', (await stored()).inputs.join(',') === moved);
+    await nav('back');
+    check('Back puts the unplaced input back', (await stored()).inputs.join(',') === moved && (await call('where')).focusAction === 'editor.input.move.2');
+    await act('editor.input.move.3'); await nav('back', 'right', 'ok');
+    check('Rename opens the in-app keyboard without a text field', await current.evaluate(() => !document.querySelector('input, textarea') && !!document.querySelector('[data-action="editor.key.done"]')));
+    await current.keyboard.press('Backspace'); await current.keyboard.press('Backspace'); await current.keyboard.press('Backspace'); await current.keyboard.press('Backspace');
+    for (const letter of 'Cinema') await current.keyboard.press(letter);
+    await act('editor.key.done');
+    check('Done saves the launcher name and keeps port 3', (await stored()).inputNames['3'] === 'Cinema' && (await stored()).inputs.includes(3) && (await call('where')).focusAction === 'editor.input.move.3');
+    await act('editor.input.rename.3');
+    await current.keyboard.press('Z');
+    await nav('back');
+    check('Back cancels only the unfinished rename', (await stored()).inputNames['3'] === 'Cinema' && !(await current.locator('#stage').innerText()).includes('Discard'));
+    await nav('back');
+    check('Editor Back leaves without a save prompt', (await call('where')).view === 'settings' && !(await current.locator('#stage').innerText()).match(/\bSave\b/));
+    await scene('home');
+    check('Home row shows the saved launcher label', (await tiles()).join(',') === 'HDMI2,HDMI1,Cinema,HDMI4');
     const calls = await current.evaluate(() => __tv.calls.length);
-    await nav('down', 'right', 'right', 'right', 'ok');
+    await nav('up', 'right', 'right', 'right', 'ok');
     await current.waitForFunction(() => ShoreQA.where().view === 'message');
     check('A port the TV did not report is an error and does not switch', (await current.locator('#stage').innerText()).includes('no longer available') && await current.evaluate(start => __tv.calls.length === start, calls));
     check('Input edits did not launch an app shortcut', (await state()).writes > before && (await stored()).home.join(',') === 'stremio,netflix,disneyplus,youtube,appletv,primevideo,abciview,sbs,applemusic');
+    for (const width of [1920, 1280]) {
+      await current.setViewportSize({ width, height: width * 9 / 16 });
+      await scene('home'); await look({ apps: 'both', layout: 'dock', shelf: 'glass' });
+      const shape = await current.evaluate(() => {
+        const tile = document.querySelector('#dock .tile'), row = document.getElementById('inputRow'), dock = document.getElementById('dock');
+        const tr = tile.getBoundingClientRect(), rr = row.getBoundingClientRect(), dr = dock.getBoundingClientRect();
+        const img = tile.querySelector('img');
+        return { ratio: tr.width / tr.height, radius: parseFloat(getComputedStyle(tile).borderRadius), label: tile.getAttribute('aria-label'), fit: img ? getComputedStyle(img).objectFit : 'contain', gap: dr.top - rr.bottom };
+      });
+      check('Home tiles stay rounded rectangles above the input row at ' + width, shape.ratio > 1.6 && shape.radius >= 20 && !!shape.label && shape.fit === 'contain' && shape.gap >= 8, shape);
+      await look({ layout: 'list' });
+      const listGap = await current.evaluate(() => {
+        const scale = document.getElementById('stage').getBoundingClientRect().width / 1920;
+        const row = document.getElementById('inputRow').getBoundingClientRect();
+        const apps = document.querySelector('.ph-rows').getBoundingClientRect();
+        return (apps.top - row.bottom) / scale;
+      });
+      check('List input row stays above the apps at ' + width, listGap >= 6, listGap);
+      await look({ layout: 'dock' });
+      await current.screenshot({ path: out + 'home-tiles-' + width + '.png' });
+      await look({ apps: 'icons' });
+      await current.screenshot({ path: out + 'home-icons-' + width + '.png' });
+      await look({ apps: 'both', shelf: 'clear' });
+      check('Clear dock keeps the tile focus plate', await current.evaluate(() => document.getElementById('dock').classList.contains('is-clear') && getComputedStyle(document.querySelector('#dock .plate')).visibility !== 'hidden'));
+      await current.screenshot({ path: out + 'dock-clear-' + width + '.png' });
+      await look({ shelf: 'glass' });
+      await editor();
+      await current.screenshot({ path: out + 'editor-apps-' + width + '.png' });
+      await nav(...Array(9).fill('down'));
+      await current.screenshot({ path: out + 'editor-inputs-' + width + '.png' });
+      await nav('ok');
+      await current.screenshot({ path: out + 'editor-moving-' + width + '.png' });
+      await nav('back', 'right', 'ok');
+      await current.screenshot({ path: out + 'editor-keyboard-' + width + '.png' });
+      await nav('back', 'back');
+    }
   });
   await run('Independent app identity self-filter', async () => {
     const appId = 'AbCdEf1234.MyHome';
@@ -550,8 +609,7 @@ try {
     await editor();
     check('Editor uses the installed icon without dropping the name', await current.evaluate(() => { const row = document.querySelector('[data-action="editor.move.netflix"]'); const img = row && row.querySelector('img'); return !!img && img.complete && img.naturalWidth > 0 && row.textContent.includes('Netflix'); }));
     await closePage();
-    await page({ catalog: CATALOG.map(a => a.id === IDS[1] ? { ...a, iconPath: '/home/assets/icons/missing-native-icon.png' } : a) });
-    current.__expectedFailures.push('/missing-native-icon.png');
+    await page({ catalog: CATALOG.map(a => a.id === IDS[1] ? { ...a, iconPath: '/home/assets/icons/missing-native-icon.png' } : a), expectedFailures: ['/missing-native-icon.png'] });
     await library();
     await current.waitForFunction(() => { const img = document.querySelector('[data-action="apps.open.netflix"] img'); return img && img.complete && img.src.includes('missing-native-icon.png'); });
     check('Known app icon failure keeps initials and the Netflix name', await current.evaluate(() => { const row = document.querySelector('[data-action="apps.open.netflix"]'), img = row.querySelector('img'); return getComputedStyle(img).display === 'none' && getComputedStyle(row.querySelector('.native-icon span')).visibility === 'visible' && row.textContent.includes('Netflix'); }));
@@ -640,11 +698,11 @@ try {
   });
   await run('Settings overview and visible choices', async () => {
     await page(); await scene('settings');
-    const expected = ['settings.group.background', 'settings.group.layout', 'settings.group.typography', 'settings.group.focus', 'settings.editor', 'settings.group.inputrow', 'settings.group.samsung'];
+    const expected = ['settings.group.background', 'settings.group.layout', 'settings.group.typography', 'settings.group.focus', 'settings.editor', 'settings.group.samsung'];
     check('Overview has the settings groups', same((await call('actions')).filter(a => expected.includes(a)).sort(), expected.slice().sort()));
     const specs = {
       background: { bg: ['dark', 'light', 'photo'] },
-      layout: { layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], controls: ['icons', 'both', 'text'] },
+      layout: { layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], controls: ['icons', 'both', 'text'], shelf: ['glass', 'clear'] },
       typography: { font: (await state()).fonts.available },
       focus: { focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'] }
     };

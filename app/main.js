@@ -5,7 +5,7 @@
   /* ---------- Bundled data ---------- */
   var ASSETS = 'assets/', ICONS = ASSETS + 'icons/', WP = ASSETS + 'wallpapers/';
   var CAP = 9, SCRIM_Y = 560;
-  var DOCK_MODES = { both: { tw: 288, th: 200, pitch: 296 }, text: { tw: 288, th: 104, pitch: 296 }, icons: { tw: 176, th: 144, pitch: 184 } };
+  var DOCK_MODES = { both: { tw: 312, th: 176, pitch: 320 }, text: { tw: 312, th: 112, pitch: 320 }, icons: { tw: 240, th: 136, pitch: 248 } };
   var GRID_ROW = 240, GRID_COL = 344, COLS = 5;
   var ED_ROW = 80, ED_SEP = 56, ED_VIEW = 752;
   var PH_TOP = 220, PH_PITCH = 128, PH_FULL = 5, PH_HEIGHT = 944, PH_COMPACT_TOP = 144, PH_COMPACT_PITCH = 88, PH_COMPACT_VISIBLE = 9;
@@ -44,15 +44,19 @@
     newsreader: { name: 'Newsreader', family: 'Study Newsreader', display: 400, ui: 400, clock: 400 }
   };
   var PRIVATE_FONTS = window.CleanFramePrivateFontIDs || [], fontMetrics = {}, unavailableFonts = {}, widthCache = {}, fontRevision = 0, fontsReady = false;
-  var LOOK_VALUES = { bg: ['dark', 'light', 'photo'], layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], font: Object.keys(FONTS).filter(function (id) { return id === 'manrope' || PRIVATE_FONTS.indexOf(id) >= 0; }), controls: ['icons', 'both', 'text'], focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'] };
-  var LOOK_NAMES = { bg: 'Background', layout: 'Layout', apps: 'Apps', font: 'Font', controls: 'Home controls', focus: 'Focus', material: 'Material' };
-  var VALUE_NAMES = { dark: 'Dark', light: 'Light', photo: 'Photo', list: 'List', dock: 'Dock', type: 'Type', glass: 'Glass', soft: 'Soft', frost: 'Frost', tint: 'Clear tint', icons: 'Icons', both: 'Icons and text', text: 'Text' };
-  var UTIL = { art: ['Art Mode', 'art'], apps: ['All apps', 'apps'], arrange: ['Arrange', 'arrange'], settings: ['Settings', 'settings'] };
+  var LOOK_VALUES = { bg: ['dark', 'light', 'photo'], layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], font: Object.keys(FONTS).filter(function (id) { return id === 'manrope' || PRIVATE_FONTS.indexOf(id) >= 0; }), controls: ['icons', 'both', 'text'], focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'], shelf: ['glass', 'clear'], inputStyle: ['text', 'icons', 'both'], inputShelf: ['glass', 'clear'], showDate: ['off', 'on'] };
+  var INPUT_ICON_CHOICES = ['auto', 'hdmi', 'switch', 'xbox', 'xbox360', 'kodi'];
+  var INPUT_ICON_LABELS = { auto: 'Auto', hdmi: 'HDMI', switch: 'Switch', xbox: 'Xbox', xbox360: 'Xbox 360', kodi: 'Kodi' };
+  var PLATE_COLOR = { stremio: '#5b45c6', netflix: '#141414', disneyplus: '#0d1b4c', youtube: '#e11d2e', appletv: '#1c1c1e', primevideo: '#1398ec', abciview: '#0b4ea2', sbs: '#c2410c', applemusic: '#e11d48', spotify: '#128a3e', hbomax: '#5b2db3', tubi: '#2e1a47' };
+  var INPUT_HOLD_MS = 520;
+  var LOOK_NAMES = { bg: 'Background', layout: 'Layout', apps: 'Apps', font: 'Font', controls: 'Home controls', focus: 'Focus', material: 'Material', shelf: 'Dock background', inputShelf: 'Input background', showDate: 'Date' };
+  var VALUE_NAMES = { dark: 'Dark', light: 'Light', photo: 'Photo', list: 'List', dock: 'Dock', type: 'Type', glass: 'Glass', soft: 'Soft', frost: 'Frost', tint: 'Clear tint', icons: 'Icons', both: 'Icons and text', text: 'Text', clear: 'Clear', off: 'Off', on: 'On' };
+  var UTIL = { apps: ['All apps', 'apps'], arrange: ['Arrange', 'arrange'], settings: ['Settings', 'settings'] };
+  var INPUT_PORTS = [1, 2, 3, 4];
   var MSG = {
     leave: { title: 'Leave Home?', line: 'Open Samsung Home?', note: '', actions: [['stay', 'Stay'], ['samsung', 'Samsung Home']] }
   };
   var SVG = {
-    art: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="9.8" r="1.5"/><path d="m4.5 17.5 4.5-4.5 3 3 2.5-2.5 5 5"/>',
     apps: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/>',
     arrange: '<path d="M4 8.5h14M15 5.5l3 3-3 3M20 15.5H6M9 12.5l-3 3 3 3"/>',
     settings: '<path d="m9 3-.6 2.4-2 1.2L4 6l-2 3.5L3.8 11v2L2 14.5 4 18l2.4-.6 2 1.2L9 21h6l.6-2.4 2-1.2 2.4.6 2-3.5-1.8-1.5v-2L22 9.5 20 6l-2.4.6-2-1.2L15 3Z"/><circle cx="12" cy="12" r="3.2"/>',
@@ -85,7 +89,85 @@
     for (var i = 0; i < list.length; i++) if (list[i].toLowerCase() === v) return list[i];
     return fallback;
   }
-  function lookOf(c) { return { bg: c.bg, wall: c.wall, layout: c.layout, apps: c.apps, font: c.font, controls: c.controls, focus: c.focus, material: c.material }; }
+  function lookOf(c) { return { bg: c.bg, wall: c.wall, layout: c.layout, apps: c.apps, font: c.font, controls: c.controls, focus: c.focus, material: c.material, shelf: c.shelf || 'glass', inputStyle: c.inputStyle || 'both', inputShelf: c.inputShelf || 'glass', showDate: c.showDate || 'off' }; }
+  function defaultInputName(port) {
+    if (port === 1) return 'HDMI1';
+    if (port === 2) return 'HDMI2';
+    if (port === 3) return 'Kodi';
+    if (port === 4) return 'HDMI4';
+    return 'HDMI' + port;
+  }
+  function copyInputNames(names) {
+    var out = {}, key;
+    names = names || {};
+    for (key in names) if (names.hasOwnProperty(key)) out[key] = names[key];
+    return out;
+  }
+  function cleanInputOrder(saved) {
+    var order = [], seen = {}, i, port;
+    if (Array.isArray(saved)) {
+      for (i = 0; i < saved.length; i++) {
+        port = saved[i];
+        if (INPUT_PORTS.indexOf(port) >= 0 && !seen[port]) { seen[port] = true; order.push(port); }
+      }
+    }
+    INPUT_PORTS.forEach(function (item) { if (!seen[item]) order.push(item); });
+    return order;
+  }
+  function cleanInputNames(saved) {
+    var out = {}, i, port, text;
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return out;
+    for (i = 0; i < INPUT_PORTS.length; i++) {
+      port = INPUT_PORTS[i];
+      text = saved[String(port)];
+      if (typeof text !== 'string') continue;
+      text = text.replace(/[\u0000-\u001f]/g, '').trim().slice(0, 24);
+      if (text && text !== defaultInputName(port)) out[String(port)] = text;
+    }
+    return out;
+  }
+  function inputLabel(port, names) {
+    var custom = (names || S.c.inputNames || {})[String(port)];
+    return custom || defaultInputName(port);
+  }
+  function cleanInputIcons(saved) {
+    var out = {}, i, port, value;
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return out;
+    for (i = 0; i < INPUT_PORTS.length; i++) {
+      port = INPUT_PORTS[i];
+      value = saved[String(port)];
+      if (INPUT_ICON_CHOICES.indexOf(value) >= 0 && value !== 'auto') out[String(port)] = value;
+    }
+    return out;
+  }
+  function cleanInputHidden(saved) {
+    var out = [], seen = {}, i, port;
+    if (!Array.isArray(saved)) return out;
+    for (i = 0; i < saved.length; i++) {
+      port = saved[i];
+      if (INPUT_PORTS.indexOf(port) >= 0 && !seen[port]) { seen[port] = true; out.push(port); }
+    }
+    return out;
+  }
+  function isInputHidden(port) { return (S.c.inputHidden || []).indexOf(port) >= 0; }
+  function visibleInputs() { return (S.c.inputs || INPUT_PORTS).filter(function (port) { return !isInputHidden(port); }); }
+  function matchInputIcon(label) {
+    var s = String(label || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (s.indexOf('xbox360') >= 0 || s.indexOf('x360') >= 0 || (s.indexOf('xbox') >= 0 && s.indexOf('360') >= 0)) return 'xbox360';
+    if (s.indexOf('xbox') >= 0) return 'xbox';
+    if (s.indexOf('switch') >= 0) return 'switch';
+    if (s.indexOf('kodi') >= 0) return 'kodi';
+    return 'hdmi';
+  }
+  function inputIconChoice(port) { return (S.c.inputIcons || {})[String(port)] || 'auto'; }
+  function inputIconLabel(value) { return INPUT_ICON_LABELS[value] || 'Auto'; }
+  function plateId(a) { return a && PLATE_COLOR[a.brand] ? a.brand : a && PLATE_COLOR[a.id] ? a.id : ''; }
+  function plateSrc(a) { var id = plateId(a); return id ? ICONS + 'plates/' + id + '.svg' : ''; }
+  function artworkSrc(a) { return a && (a.icon || plateSrc(a)) || ''; }
+  function resolvedInputIcon(port) {
+    var choice = inputIconChoice(port);
+    return choice === 'auto' ? matchInputIcon(inputLabel(port)) : choice;
+  }
   function materialApplies(c) { c = c || S.c; return c.bg === 'photo' && (c.layout === 'dock' || c.focus === 'glass'); }
 
   /* ---------- Helpers ---------- */
@@ -137,11 +219,16 @@
     return '<span class="mark' + (markProbes[id] === 'bad' ? ' is-bad' : '') + '" data-mark="' + id + '" style="width:' + w + 'px;height:' + h + 'px">'
       + (maskSupport ? '<span class="mk" style="' + st + ';-webkit-mask-image:url(' + ICONS + id + '.svg);mask-image:url(' + ICONS + id + '.svg)"></span>' : '<img alt="" src="' + ICONS + id + '.svg" style="' + st + '">') + '</span>';
   }
-  function appMark(a, w, h, size) {
+  function appMark(a, w, h, size, fill) {
+    var src = artworkSrc(a), words = a.name.split(/\s+/), letters = words[0].charAt(0) + (words.length > 1 ? words[1].charAt(0) : ''), color = a.icon ? '' : PLATE_COLOR[plateId(a)] || '';
+    if (fill && src) {
+      return '<span class="mark native-icon art-cover"><span>' + esc(letters.toUpperCase()) + '</span><img class="art-fill" alt="" data-native-icon="true" src="' + esc(src) + '"></span>';
+    }
+    var monogram = '<span class="mark monogram' + (src ? ' native-icon' : '') + '" style="width:' + w + 'px;height:' + h + 'px;font-size:' + Math.round(size * .65) + 'px' + (color ? ';background:' + color : '') + '"><span>' + esc(letters.toUpperCase()) + '</span>'
+      + (src ? '<img class="art-logo" alt="" data-native-icon="true" src="' + esc(src) + '">' : '') + '</span>';
+    if (src) return monogram;
     if (a.mark && (maskSupport || S.c.bg !== 'light')) return markHtml(a.brand || a.id, w, h, size);
-    var words = a.name.split(/\s+/), letters = words[0].charAt(0) + (words.length > 1 ? words[1].charAt(0) : '');
-    return '<span class="mark monogram' + (a.icon ? ' native-icon' : '') + '" style="width:' + w + 'px;height:' + h + 'px;font-size:' + Math.round(size * .65) + 'px"><span>' + esc(letters.toUpperCase()) + '</span>'
-      + (a.icon ? '<img alt="" data-native-icon="true" src="' + esc(a.icon) + '">' : '') + '</span>';
+    return monogram;
   }
   function smallMark(a) { return appMark(a, 56, 44, 36); }
   var measureCanvas = document.createElement('canvas'), measureContext = measureCanvas.getContext('2d'), measureSpan = document.createElement('span');
@@ -278,7 +365,7 @@
     return { size: size, top: (compact ? 10.66 : size === 76 ? 10.36 : 9.68) + fontShift('display', size) - (compact && homeFont() === 'newsreader' ? .7 : 0), width: Math.min(limit, width), ellipsis: width > limit };
   }
   function listPlateWidth(id, compact) {
-    if (S.c.apps === 'icons') return compact ? 120 : 144;
+    if (S.c.apps === 'icons') return compact ? 168 : 248;
     var text = S.c.apps === 'text';
     return clamp(Math.ceil(photoLabel(id, compact).width + (text ? 84 : compact ? 156 : 184)), text ? 280 : 360, text ? compact ? 724 : 1076 : compact ? 796 : 1176);
   }
@@ -302,11 +389,43 @@
     el.innerHTML = renderContent();
     el._sig = sig;
     Array.prototype.forEach.call(el.querySelectorAll('[data-native-icon]'), function (img) {
-      function ready() { img.parentNode.classList.add('has-native-icon'); }
-      function failed() { img.style.display = 'none'; img.parentNode.classList.remove('has-native-icon'); }
+      function ready() { img.parentNode.classList.add('has-native-icon'); extendIconBackground(img); }
+      function failed() {
+        var tile = img;
+        img.style.display = 'none';
+        if (img.parentNode.classList) img.parentNode.classList.remove('has-native-icon');
+        while (tile && tile !== document.body && !/(?:^|\s)(?:tile|gt|ph-row|sc|er)(?:\s|$)/.test(tile.className || '')) tile = tile.parentNode;
+        if (!tile || tile === document.body) return;
+        Array.prototype.forEach.call(tile.querySelectorAll('.art-fill'), function (fill) { fill.style.display = 'none'; });
+        tile.className = tile.className.replace(/ has-art| has-plate/g, '');
+        tile.style.removeProperty('--art-plate');
+      }
       img.onload = ready; img.onerror = failed;
       if (img.complete) { if (img.naturalWidth) ready(); else failed(); }
     });
+  }
+  /* A readable edge color can paint the tile. Cross-origin pictures skip the sample;
+     their cover image still fills the rectangle and the contained copy stays uniform. */
+  function extendIconBackground(img) {
+    var canvas, ctx, size = 12, data, x, y, p, r = 0, g = 0, b = 0, n = 0, transparent = 0, tile = img.parentNode;
+    while (tile && tile !== document.body && !/(?:^|\s)(?:tile|gt|ph-row|sc|er)(?:\s|$)/.test(tile.className || '')) tile = tile.parentNode;
+    if (!tile || tile === document.body) return;
+    try {
+      canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, size, size);
+      data = ctx.getImageData(0, 0, size, size).data;
+    } catch (e) { return; }
+    for (y = 0; y < size; y++) for (x = 0; x < size; x++) {
+      if (x && y && x !== size - 1 && y !== size - 1) continue;
+      p = (y * size + x) * 4;
+      if (data[p + 3] < 220) { transparent++; continue; }
+      r += data[p]; g += data[p + 1]; b += data[p + 2]; n++;
+    }
+    if (n < 8 || transparent > n) return;
+    tile.style.setProperty('--icon-extend', 'rgb(' + Math.round(r / n) + ',' + Math.round(g / n) + ',' + Math.round(b / n) + ')');
+    if (tile.className.indexOf('has-icon-extend') < 0) tile.className += ' has-icon-extend';
   }
   function setHTML(el, html) { if (el._html !== html) { el._html = html; el.innerHTML = html; } }
   function attrs(el, z, i, action) { el.setAttribute('data-z', z); el.setAttribute('data-i', String(i)); el.setAttribute('data-action', action); }
@@ -343,10 +462,12 @@
     return {
       bg: pick(modern.bg, LOOK_VALUES.bg, legacyList ? 'dark' : 'photo'), layout: pick(modern.layout, LOOK_VALUES.layout, legacyList ? 'list' : 'dock'),
       apps: pick(modern.apps, LOOK_VALUES.apps, legacyList ? 'text' : 'both'), controls: pick(modern.controls, LOOK_VALUES.controls, 'both'),
-      focus: pick(modern.focus, LOOK_VALUES.focus, legacyList ? 'type' : 'glass'), material: pick(modern.material, LOOK_VALUES.material, 'soft'),
+      focus: pick(modern.focus, LOOK_VALUES.focus, legacyList ? 'type' : 'glass'), material: pick(modern.material, LOOK_VALUES.material, 'soft'), shelf: pick(modern.shelf, LOOK_VALUES.shelf, 'glass'), inputStyle: pick(modern.inputStyle, LOOK_VALUES.inputStyle, 'both'), inputShelf: pick(modern.inputShelf, LOOK_VALUES.inputShelf, 'glass'),
+      showDate: pick(modern.showDate, LOOK_VALUES.showDate, 'off'),
       font: pick(modern.font, LOOK_VALUES.font, 'manrope'), wall: wall(modern.wall || s.wallpaper) ? modern.wall || s.wallpaper : WALLS[0].id,
       home: h, recent: recent, lastApp: h.indexOf(s.lastApp) >= 0 ? s.lastApp : h[0],
-      mode: pick(s.mode, MODES.map(function (m) { return m.id; }), 'fixed')
+      mode: pick(s.mode, MODES.map(function (m) { return m.id; }), 'fixed'),
+      inputs: cleanInputOrder(s.inputs), inputNames: cleanInputNames(s.inputNames), inputIcons: cleanInputIcons(s.inputIcons), inputHidden: cleanInputHidden(s.inputHidden)
     };
   }
   function serialise(c) {
@@ -354,6 +475,10 @@
     Object.keys(c).forEach(function (key) { out[key] = c[key]; });
     out.version = 2; out.look = lookOf(c); out.dock = c.home.slice(); out.wallpaper = c.wall;
     out.theme = c.layout === 'list' ? 'list' : 'shore';
+    out.inputs = (c.inputs || INPUT_PORTS).slice();
+    out.inputNames = copyInputNames(c.inputNames);
+    out.inputIcons = cleanInputIcons(c.inputIcons);
+    out.inputHidden = cleanInputHidden(c.inputHidden);
     out.appRecords = [];
     c.home.concat(c.recent).forEach(function (key) {
       var a = app(key);
@@ -363,7 +488,7 @@
   }
   function initialise() {
     var saved = load(), initial; S.c = clean(saved); initial = next(S.c.home.slice(), S.c.recent.slice());
-    S.stack = [{ id: 'home', f: { zone: 'apps', u: 0 } }];
+    S.stack = [{ id: 'home', f: { zone: 'apps', u: 0, p: 0 } }];
     S.sel = S.c.lastApp; S.selIdx = S.c.home.indexOf(S.sel);
     if (saved && initial.mode === 'open') initial.wall = WALLS[(wallIndex(initial.wall) + 1) % WALLS.length].id;
     // Keep the old schema keys alongside the builder values for in-place updates.
@@ -371,7 +496,15 @@
   }
   function clearSession() { S.undo = []; S.removedAt = {}; S.note = null; S.err = null; }
   function begin() { S.note = null; }
-  function next(home, recent) { var c = lookOf(S.c); c.home = home; c.recent = recent; c.lastApp = S.c.lastApp; c.mode = S.c.mode; return c; }
+  function next(home, recent) {
+    var c = lookOf(S.c);
+    c.home = home; c.recent = recent; c.lastApp = S.c.lastApp; c.mode = S.c.mode;
+    c.inputs = (S.c.inputs || INPUT_PORTS).slice();
+    c.inputNames = copyInputNames(S.c.inputNames);
+    c.inputIcons = cleanInputIcons(S.c.inputIcons);
+    c.inputHidden = cleanInputHidden(S.c.inputHidden);
+    return c;
+  }
   function snap() { return { home: S.c.home.slice(), recent: S.c.recent.slice() }; }
   function pushRecent(list, id) { return [id].concat(without(list, id)).slice(0, 5); }
   function write(c, label) {
@@ -491,15 +624,14 @@
   }
 
   /* ---------- Navigation targets ---------- */
-  function utils() { return ['art', 'apps', 'settings']; }
+  function utils() { return ['apps', 'settings']; }
   /* prev/next run along the apps; out goes to the controls, inn comes back (or to a per-app action). */
   function axes() {
     var v = S.c.layout === 'list';
     return { prev: v ? 'up' : 'left', next: v ? 'down' : 'right', out: v ? 'right' : 'up', inn: v ? 'left' : 'down' };
   }
   function utilAction(u) {
-    if (u === 'art') perform('Art Mode', FrameDevice.art);
-    else if (u === 'apps') openApps();
+    if (u === 'apps') openApps();
     else openSettings();
   }
   function addAppsRoute() { openEditor('home'); }
@@ -518,7 +650,7 @@
     var i = ensureSel();
     clearSession();
     refreshCatalog();
-    push({ id: 'editor', origin: origin, lifted: null, top: 0, otherReturn: { id: otherList()[0] || null, index: 0, top: 0 }, f: { zone: S.c.home.length ? 'home' : 'other', i: Math.max(0, i), part: 'name', h: 1, j: 0 } });
+    push({ id: 'editor', origin: origin, lifted: null, top: 0, homeTop: 0, renaming: false, kb: null, kbText: '', renamePort: 0, otherReturn: { id: otherList()[0] || null, index: 0, top: 0 }, f: { zone: S.c.home.length ? 'home' : (S.c.inputs.length ? 'inputs' : 'other'), i: Math.max(0, i), part: 'name', h: 1, j: 0, p: 0 } });
   }
   function openWallpaper() {
     var i = wallIndex(S.c.wall);
@@ -535,17 +667,25 @@
     key: function (t, k) {
       var f = t.f, h = S.c.home, U = utils(), x = axes(), i = ensureSel();
       if (S.c.layout === 'list') { listHomeKey(t, k, i, U); return; }
+      if (f.zone === 'inports') { inputRowKey(t, k); return; }
       if (f.zone === 'util') {
         f.u = clamp(f.u, 0, U.length - 1);
         if (k === x.prev && f.u > 0) f.u--;
         else if (k === x.next && f.u < U.length - 1) f.u++;
-        else if (k === x.inn || k === 'back') f.zone = 'apps';
+        else if (k === 'back') f.zone = 'apps';
+        else if (k === x.inn) {
+          if (visibleInputs().length) { f.zone = 'inports'; f.p = clamp(f.p || 0, 0, visibleInputs().length - 1); }
+          else f.zone = 'apps';
+        }
         else if (k === 'ok') { S.lastUtil = f.u; utilAction(U[f.u]); return; }
         S.lastUtil = f.u;
         return;
       }
       f.zone = 'apps';
-      if (k === x.out) { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
+      if (k === x.out) {
+        if (visibleInputs().length) { f.zone = 'inports'; f.p = clamp(f.p || 0, 0, visibleInputs().length - 1); }
+        else { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
+      }
       else if (k === 'back') openMessage('leave');
       else if (!h.length) { if (k === 'ok') addAppsRoute(); }
       else if (k === x.prev && i > 0) setSel(h[i - 1]);
@@ -555,13 +695,33 @@
     point: function (t, z, i) {
       if (z === 'util') { t.f.zone = 'util'; t.f.u = i; S.lastUtil = i; }
       else if (z === 'app') { t.f.zone = 'apps'; setSel(S.c.home[i]); }
+      else if (z === 'inport') { t.f.zone = 'inports'; t.f.p = i; }
       else if (z === 'empty') t.f.zone = 'apps';
       else return;
       this.key(t, 'ok');
     }
   };
+  function inputRowKey(t, k) {
+    var ports = visibleInputs(), p = clamp(t.f.p || 0, 0, Math.max(0, ports.length - 1));
+    if (!ports.length) { t.f.zone = 'apps'; return; }
+    t.f.p = p;
+    if (S.c.layout === 'list') {
+      if (k === 'up' && p > 0) t.f.p--;
+      else if (k === 'down' && p < ports.length - 1) t.f.p++;
+      else if (k === 'down' || k === 'back') t.f.zone = 'apps';
+      else if (k === 'right') { t.f.zone = 'util'; t.f.u = clamp(S.lastUtil, 0, utils().length - 1); }
+      else if (k === 'ok') perform(inputLabel(ports[p]), function (done) { FrameDevice.setSource(ports[p], done); });
+      return;
+    }
+    if (k === 'left' && p > 0) t.f.p--;
+    else if (k === 'right' && p < ports.length - 1) t.f.p++;
+    else if (k === 'down' || k === 'back') t.f.zone = 'apps';
+    else if (k === 'up') { t.f.zone = 'util'; t.f.u = clamp(S.lastUtil, 0, utils().length - 1); }
+    else if (k === 'ok') perform(inputLabel(ports[p]), function (done) { FrameDevice.setSource(ports[p], done); });
+  }
   function listHomeKey(t, k, i, U) {
     var f = t.f, h = S.c.home;
+    if (f.zone === 'inports') { inputRowKey(t, k); return; }
     if (f.zone === 'util') {
       f.u = clamp(f.u, 0, U.length - 1);
       if (k === 'up' && f.u > 0) f.u--;
@@ -573,6 +733,7 @@
     }
     f.zone = 'apps';
     if (k === 'up' && i > 0) setSel(h[i - 1]);
+    else if (k === 'up' && visibleInputs().length) { f.zone = 'inports'; f.p = clamp(f.p || 0, 0, visibleInputs().length - 1); }
     else if (k === 'right') { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
     else if (k === 'down' && i < h.length - 1) setSel(h[i + 1]);
     else if (k === 'back') openMessage('leave');
@@ -716,6 +877,105 @@
   function otherList() { var o = otherGroups(); return o.recent.concat(o.rest); }
   function editorCut() { return 5; }
   function editorHomeY(i) { return i * ED_ROW + (i >= editorCut() ? 24 : 0); }
+  function editorOrder(t) { return t.lifted && t.lifted.kind !== 'input' ? t.lifted.order : S.c.home; }
+  function inputOrder(t) { return t.lifted && t.lifted.kind === 'input' ? t.lifted.order : S.c.inputs; }
+  function editorInputOrigin(count) { return count ? editorHomeY(count - 1) + ED_ROW + 8 : 0; }
+  function kbRows(t) {
+    if (t.kb && t.kb.mode === 'nums') return [['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'], ['-', '/', ':', ';', '(', ')', '&', '@'], ['.', ',', '?', '!', "'", '"', 'bksp'], ['abc', 'space', 'done', 'cancel']];
+    return [['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'], ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'], ['shift', 'z', 'x', 'c', 'v', 'b', 'n', 'm', 'bksp'], ['nums', 'space', 'done', 'cancel']];
+  }
+  function kbLabel(t, key) {
+    if (key === 'shift') return t.kb.shift ? 'abc' : 'ABC';
+    if (key === 'bksp') return 'Delete';
+    if (key === 'nums') return '123';
+    if (key === 'abc') return 'ABC';
+    if (key === 'space') return 'Space';
+    if (key === 'done') return 'Done';
+    if (key === 'cancel') return 'Cancel';
+    if (t.kb.shift && key.length === 1 && key >= 'a' && key <= 'z') return key.toUpperCase();
+    return key;
+  }
+  function kbInsert(t, ch) { t.kbText = ((t.kbText || '') + ch).replace(/[\u0000-\u001f]/g, '').slice(0, 24); }
+  function kbAction(key) { return 'editor.key.' + (key === "'" ? 'apos' : key === '"' ? 'quot' : key); }
+  function closeInputKeyboard(t, part) {
+    var backHome = t.renameHome, port = t.renamePort, home, visible, idx;
+    t.renaming = false;
+    t.renameHome = false;
+    if (backHome) {
+      pop();
+      home = top();
+      if (home && home.id === 'home') {
+        visible = visibleInputs();
+        idx = visible.indexOf(port);
+        if (idx >= 0) { home.f.zone = 'inports'; home.f.p = idx; }
+        else home.f.zone = 'apps';
+      }
+      return;
+    }
+    t.f.zone = 'inputs';
+    t.f.part = part || 'hide';
+  }
+  function beginInputRename(port, backHome) {
+    var idx = (S.c.inputs || []).indexOf(port), t;
+    if (idx < 0) return;
+    if (top().id !== 'editor') openEditor('home');
+    t = top();
+    t.f.zone = 'inputs';
+    t.f.p = idx;
+    t.f.part = 'name';
+    t.renameHome = !!backHome;
+    openInputKeyboard(t);
+    render();
+  }
+  function openInputKeyboard(t) {
+    var order = inputOrder(t);
+    t.renamePort = order[t.f.p];
+    t.kbText = inputLabel(t.renamePort);
+    t.kb = { r: 0, c: 0, shift: false, mode: 'letters' };
+    t.renaming = true;
+    t.f.zone = 'keys';
+  }
+  function commitInputRename(t) {
+    var port = t.renamePort, text = (t.kbText || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 24), names;
+    if (!port) { closeInputKeyboard(t, 'name'); return; }
+    if (!text || text === inputLabel(port)) { closeInputKeyboard(t, 'name'); return; }
+    names = copyInputNames(S.c.inputNames);
+    if (text === defaultInputName(port)) delete names[String(port)];
+    else names[String(port)] = text;
+    if (!writeInputState(null, names, 'Rename input')) return;
+    closeInputKeyboard(t, 'name');
+    S.note = inputLabel(port) + ' is a launcher name. The TV source name is unchanged.';
+  }
+  function kbActivate(t) {
+    var rows = kbRows(t), key = rows[t.kb.r][t.kb.c];
+    if (key === 'shift') { t.kb.shift = !t.kb.shift; return; }
+    if (key === 'nums') { t.kb.mode = 'nums'; t.kb.r = 0; t.kb.c = 0; return; }
+    if (key === 'abc') { t.kb.mode = 'letters'; t.kb.r = 0; t.kb.c = 0; return; }
+    if (key === 'bksp') { t.kbText = (t.kbText || '').slice(0, -1); return; }
+    if (key === 'space') { kbInsert(t, ' '); return; }
+    if (key === 'done') { commitInputRename(t); return; }
+    if (key === 'cancel') { closeInputKeyboard(t, 'hide'); return; }
+    kbInsert(t, kbLabel(t, key));
+  }
+  function kbPanelHtml(t) {
+    var rows = kbRows(t), html = '<div class="kb-name">' + esc(t.kbText || '') + '</div><div class="kb-grid">', r, c, key, label, x, w, cols, count, keyW, rowW, start, foot, widths;
+    for (r = 0; r < rows.length - 1; r++) {
+      cols = rows[r]; count = cols.length; keyW = Math.floor((752 - 8 * (count - 1)) / count);
+      rowW = count * keyW + (count - 1) * 8; start = Math.floor((752 - rowW) / 2);
+      for (c = 0; c < count; c++) {
+        key = cols[c]; label = kbLabel(t, key);
+        html += '<button type="button" tabindex="-1" class="kb-key' + (t.kb.r === r && t.kb.c === c ? ' is-focus' : '') + '" style="left:' + (start + c * (keyW + 8)) + 'px;top:' + (r * 68) + 'px;width:' + keyW + 'px" data-z="key" data-i="' + c + '" data-id="' + r + '" data-action="' + kbAction(key) + '" aria-label="' + esc(label) + '"><span>' + esc(label) + '</span></button>';
+      }
+    }
+    html += '</div><div class="kb-foot">';
+    foot = rows[rows.length - 1]; widths = [108, 312, 150, 150]; x = 0;
+    for (c = 0; c < foot.length; c++) {
+      key = foot[c]; label = kbLabel(t, key); w = widths[c];
+      html += '<button type="button" tabindex="-1" class="kb-key' + (t.kb.r === rows.length - 1 && t.kb.c === c ? ' is-focus' : '') + '" style="left:' + x + 'px;top:0;width:' + w + 'px" data-z="key" data-i="' + c + '" data-id="' + (rows.length - 1) + '" data-action="' + kbAction(key) + '" aria-label="' + esc(label) + '"><span>' + esc(label) + '</span></button>';
+      x += w + 8;
+    }
+    return html + '</div>';
+  }
   function editorOtherY(j) {
     var o = otherGroups();
     return j * ED_ROW + (o.recent.length ? ED_SEP : 0) + (o.recent.length && j >= o.recent.length ? ED_SEP : 0);
@@ -741,14 +1001,36 @@
   V.editor = {
     sheet: true,
     norm: function (t) {
-      var f = t.f, nh = (t.lifted ? t.lifted.order : S.c.home).length, no = otherList().length;
+      var f = t.f, nh = editorOrder(t).length, no = otherList().length, ni = inputOrder(t).length;
       f.i = clamp(f.i, 0, Math.max(0, nh - 1));
       f.j = clamp(f.j, 0, Math.max(0, no - 1));
-      if (f.zone === 'home' && !nh) f.zone = no ? 'other' : 'head';
-      if (f.zone === 'other' && !no) f.zone = nh ? 'home' : 'head';
+      f.p = clamp(f.p || 0, 0, Math.max(0, ni - 1));
+      if (t.renaming) { f.zone = 'keys'; if (!t.kb) t.kb = { r: 0, c: 0, shift: false, mode: 'letters' }; return; }
+      if (t.lifted && t.lifted.kind === 'input') { f.zone = 'inputs'; f.part = 'name'; return; }
+      if (f.zone === 'keys') f.zone = ni ? 'inputs' : (nh ? 'home' : 'head');
+      if (f.zone === 'home' && !nh) f.zone = ni ? 'inputs' : (no ? 'other' : 'head');
+      if (f.zone === 'inputs' && !ni) f.zone = nh ? 'home' : (no ? 'other' : 'head');
+      if (f.zone === 'other' && !no) f.zone = nh ? 'home' : (ni ? 'inputs' : 'head');
     },
     key: function (t, k) {
-      var f = t.f, H = t.lifted ? t.lifted.order : S.c.home, O = otherList(), nh = H.length, no = O.length, d, tmp;
+      var f = t.f, H = editorOrder(t), P = inputOrder(t), O = otherList(), nh = H.length, ni = P.length, no = O.length, d, tmp, rows;
+      if (t.renaming) {
+        rows = kbRows(t);
+        if (k === 'left' && t.kb.c > 0) t.kb.c--;
+        else if (k === 'right' && t.kb.c < rows[t.kb.r].length - 1) t.kb.c++;
+        else if (k === 'up' && t.kb.r > 0) { t.kb.r--; t.kb.c = Math.min(t.kb.c, rows[t.kb.r].length - 1); }
+        else if (k === 'down' && t.kb.r < rows.length - 1) { t.kb.r++; t.kb.c = Math.min(t.kb.c, rows[t.kb.r].length - 1); }
+        else if (k === 'ok') kbActivate(t);
+        else if (k === 'back') closeInputKeyboard(t, 'hide');
+        return;
+      }
+      if (t.lifted && t.lifted.kind === 'input') {
+        d = k === 'up' ? -1 : k === 'down' ? 1 : 0;
+        if (d && f.p + d >= 0 && f.p + d < ni) { tmp = P[f.p + d]; P[f.p + d] = P[f.p]; P[f.p] = tmp; f.p += d; S.err = null; }
+        else if (k === 'ok') placeInputOrder(t);
+        else if (k === 'back') { f.p = t.lifted.from; t.lifted = null; S.err = null; }
+        return;
+      }
       if (t.lifted) {
         d = k === 'up' ? -1 : k === 'down' ? 1 : 0;
         if (d && f.i + d >= 0 && f.i + d < nh) { tmp = H[f.i + d]; H[f.i + d] = H[f.i]; H[f.i] = tmp; f.i += d; S.err = null; }
@@ -760,17 +1042,27 @@
       if (f.zone === 'head') {
         if (k === 'left' && f.h > 0) f.h--;
         else if (k === 'right' && f.h < 1) f.h++;
-        else if (k === 'down') { if (no) returnOther(t); else if (nh) f.zone = 'home'; }
+        else if (k === 'down') { if (no) returnOther(t); else if (nh) f.zone = 'home'; else if (ni) f.zone = 'inputs'; }
         else if (k === 'ok') { begin(); if (f.h === 0) undoLast(null); else closeEditor(t); }
       } else if (f.zone === 'home') {
         if (k === 'up') { if (f.i > 0) f.i--; else f.zone = 'head'; }
-        else if (k === 'down') { if (f.i < nh - 1) f.i++; }
+        else if (k === 'down') { if (f.i < nh - 1) f.i++; else if (ni) { f.zone = 'inputs'; f.p = 0; f.part = 'name'; } }
         else if (k === 'right') { if (f.part === 'name') f.part = 'remove'; else if (no) returnOther(t); }
         else if (k === 'left') { if (f.part === 'remove') f.part = 'name'; }
         else if (k === 'ok') {
           begin();
           if (f.part === 'name') t.lifted = { id: H[f.i], from: f.i, order: H.slice(), snap: snap() };
           else editorRemove(t, H[f.i]);
+        }
+      } else if (f.zone === 'inputs') {
+        if (k === 'up') { if (f.p > 0) f.p--; else if (nh) { f.zone = 'home'; f.i = nh - 1; f.part = 'name'; } else f.zone = 'head'; }
+        else if (k === 'down') { if (f.p < ni - 1) f.p++; }
+        else if (k === 'right') { if (f.part === 'name') f.part = 'hide'; else if (no) returnOther(t); }
+        else if (k === 'left') { if (f.part === 'hide') f.part = 'name'; }
+        else if (k === 'ok') {
+          begin();
+          if (f.part === 'name') t.lifted = { kind: 'input', port: P[f.p], from: f.p, order: P.slice() };
+          else toggleInputHidden(P[f.p]);
         }
       } else {
         if (k === 'up') { if (f.j > 0) { f.j--; rememberOther(t); } else f.zone = 'head'; }
@@ -779,9 +1071,12 @@
         else if (k === 'ok') { begin(); editorAdd(t, O[f.j]); }
       }
     },
-    point: function (t, z, i) {
+    point: function (t, z, i, id) {
+      if (t.renaming) { if (z === 'key') { t.kb.r = +id; t.kb.c = i; this.key(t, 'ok'); } return; }
+      if (t.lifted && t.lifted.kind === 'input') { if (z === 'iname' && i === t.f.p) this.key(t, 'ok'); return; }
       if (t.lifted) { if (z === 'name' && i === t.f.i) this.key(t, 'ok'); return; }
       if (z === 'name' || z === 'remove') { t.f.zone = 'home'; t.f.i = i; t.f.part = z; }
+      else if (z === 'iname' || z === 'ihide') { t.f.zone = 'inputs'; t.f.p = i; t.f.part = z === 'iname' ? 'name' : 'hide'; }
       else if (z === 'other') { t.f.zone = 'other'; t.f.j = i; rememberOther(t); }
       else if (z === 'head') { t.f.zone = 'head'; t.f.h = i; }
       else return;
@@ -811,6 +1106,41 @@
     S.note = app(L.id).name + ' moved to position ' + (t.f.i + 1) + '.';
   }
   function closeEditor() { clearSession(); pop(); }
+  function writeInputState(order, names, label) {
+    var c = next(S.c.home.slice(), S.c.recent.slice());
+    c.inputs = order ? order.slice() : c.inputs;
+    if (names) c.inputNames = names;
+    return write(c, label);
+  }
+  function placeInputOrder(t) {
+    var L = t.lifted, order = L.order.slice(), i, same = order.length === S.c.inputs.length;
+    for (i = 0; same && i < order.length; i++) if (order[i] !== S.c.inputs[i]) same = false;
+    if (same) { t.lifted = null; return; }
+    if (!writeInputState(order, null, 'Reorder inputs')) return;
+    t.lifted = null;
+    S.note = inputLabel(L.port) + ' moved to position ' + (t.f.p + 1) + '.';
+  }
+  function toggleInputHidden(port) {
+    var hidden = cleanInputHidden(S.c.inputHidden), at = hidden.indexOf(port), c;
+    if (at >= 0) hidden.splice(at, 1);
+    else hidden.push(port);
+    c = next(S.c.home.slice(), S.c.recent.slice());
+    c.inputHidden = hidden;
+    if (!write(c, (at >= 0 ? 'Show ' : 'Hide ') + inputLabel(port))) return false;
+    S.note = inputLabel(port) + (at >= 0 ? ' is on the row again.' : ' is hidden. Its port and name are kept.');
+    return true;
+  }
+  function setInputIcon(port, value) {
+    var icons, c;
+    if (INPUT_ICON_CHOICES.indexOf(value) < 0) return false;
+    icons = cleanInputIcons(S.c.inputIcons);
+    if (value === 'auto') delete icons[String(port)];
+    else icons[String(port)] = value;
+    c = next(S.c.home.slice(), S.c.recent.slice());
+    c.inputIcons = icons;
+    if ((inputIconChoice(port) === value) || (value === 'auto' && inputIconChoice(port) === 'auto')) return true;
+    return write(c, 'Input icon ' + inputLabel(port));
+  }
 
   /* ---------- Settings, Layout and messages ---------- */
   function mode() { for (var i = 0; i < MODES.length; i++) if (MODES[i].id === S.c.mode) return MODES[i]; return MODES[0]; }
@@ -861,13 +1191,20 @@
     if (t.group === 'layout') return [
       { id: 'layout', title: 'Layout', horizontal: true, items: options('layout', ['list', 'dock']) },
       { id: 'apps', title: 'App display', horizontal: true, items: options('apps', ['text', 'icons', 'both']) },
-      { id: 'controls', title: 'Home controls', horizontal: true, items: options('controls', ['text', 'icons', 'both']) }
+      { id: 'controls', title: 'Home controls', horizontal: true, items: options('controls', ['text', 'icons', 'both']) },
+      { id: 'shelf', title: 'Dock background', horizontal: true, items: options('shelf', ['glass', 'clear']) },
+      { id: 'inputShelf', title: 'Input background', horizontal: true, items: options('inputShelf', ['glass', 'clear']) },
+      { id: 'inputStyle', title: 'Input display', horizontal: true, items: options('inputStyle', ['text', 'icons', 'both']) },
+      { id: 'inputIcons', title: 'Input icons', items: (S.c.inputs || INPUT_PORTS).map(function (port) {
+        return { action: 'inputmenu.' + port, label: inputLabel(port), menu: port, valueLabel: inputIconLabel(inputIconChoice(port)) };
+      }) }
     ];
     if (t.group === 'typography') return [{ id: 'font', title: '', items: options('font', LOOK_VALUES.font) }];
     if (t.group === 'focus') return [
       { id: 'focus', title: 'Focus style', horizontal: true, items: options('focus', ['type', 'glass']) },
       { id: 'material', title: 'Material', horizontal: true, items: options('material', ['soft', 'frost', 'tint'], inactive),
-        reason: inactive ? flat ? 'Materials are available with a Photo background.' : 'Choose Glass focus or the Dock layout to use materials.' : '' }
+        reason: inactive ? flat ? 'Materials are available with a Photo background.' : 'Choose Glass focus or the Dock layout to use materials.' : '' },
+      { id: 'showDate', title: 'Date', horizontal: true, items: options('showDate', ['off', 'on']) }
     ];
     if (t.group === 'rotation') return [{ id: 'mode', title: '', items: options('mode', MODES.map(function (m) { return m.id; }), flat),
       reason: flat ? 'Choose Photo in Background to use rotation.' : 'Timed changes pause while Settings or another panel is open.' }];
@@ -885,6 +1222,9 @@
       else enabled.forEach(function (item) { rows.push([item]); });
     });
     if (S.lookError) rows.push([{ action: 'settings.retry', label: 'Try again' }]);
+    if (t.iconMenu) INPUT_ICON_CHOICES.forEach(function (value) {
+      rows.push([{ action: 'inputicon.' + t.iconMenu.port + '.' + value, menuOption: true, port: t.iconMenu.port, value: value, label: inputIconLabel(value) }]);
+    });
     return rows;
   }
   function detailLocation(t) {
@@ -925,7 +1265,18 @@
       if (error && error.patch[error.row] !== undefined) detailFocus(t, choice(error.row, error.patch[error.row]), 0);
       if (error && error.row === 'mode') applyRotation(error.patch.mode);
       else if (error) setLook(error.patch, { row: error.row });
-    } else if (item.axis === 'mode') applyRotation(item.value);
+    } else if (item.action.indexOf('inputmenu.') === 0) {
+      var menuPort = Number(item.action.slice(10));
+      t.iconMenu = { port: menuPort, value: inputIconChoice(menuPort) };
+      t.f.action = 'inputicon.' + menuPort + '.' + t.iconMenu.value;
+    } else if (item.action.indexOf('inputicon.') === 0) {
+      var iconBits = item.action.split('.');
+      setInputIcon(Number(iconBits[1]), iconBits[2]);
+      t.f.action = 'inputmenu.' + iconBits[1];
+      S.detailFocus[t.group] = t.f.action;
+      t.iconMenu = null;
+    }
+    else if (item.axis === 'mode') applyRotation(item.value);
     else if (item.axis) { patch[item.axis] = item.value; setLook(patch, { row: item.axis }); }
     else if (item.action === 'background.wallpaper') openWallpaper();
     else if (item.action === 'background.rotation') openAppearance('rotation');
@@ -952,7 +1303,21 @@
       if (t.f.column === undefined) t.f.column = detailLocation(t).column;
     },
     key: function (t, k) {
-      var at = detailLocation(t), row = at.row, column = at.column;
+      var at, row, column, opts, i, port;
+      if (t.iconMenu) {
+        opts = INPUT_ICON_CHOICES;
+        i = opts.indexOf(t.iconMenu.value);
+        if (i < 0) i = 0;
+        port = t.iconMenu.port;
+        if (k === 'back') { t.iconMenu = null; t.f.action = 'inputmenu.' + port; S.detailFocus[t.group] = t.f.action; return; }
+        if (k === 'ok') { setInputIcon(port, opts[i]); t.iconMenu = null; t.f.action = 'inputmenu.' + port; S.detailFocus[t.group] = t.f.action; return; }
+        if (k === 'up' && i > 0) i--;
+        if (k === 'down' && i < opts.length - 1) i++;
+        t.iconMenu.value = opts[i];
+        t.f.action = 'inputicon.' + port + '.' + opts[i];
+        return;
+      }
+      at = detailLocation(t); row = at.row; column = at.column;
       if (k === 'back') { detailBack(); return; }
       if (k === 'ok') { detailOk(t, at.item); return; }
       if (k === 'up' || k === 'down') {
@@ -1000,7 +1365,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var stage = $('stage'), homeEl = $('home'), caption = $('caption'), utilsEl = $('utils');
   var utilFocusLabel = $('utilFocusLabel'), utilFocusKey = '', appFocusName = $('appFocusName');
-  var dock = $('dock'), shelf = $('shelf'), track = $('track'), plate = $('plate'), matScrim = $('matScrim'), dockEmpty = $('dockEmpty');
+  var dock = $('dock'), shelf = $('shelf'), track = $('track'), plate = $('plate'), matScrim = $('matScrim'), dockEmpty = $('dockEmpty'), inputRow = $('inputRow');
   var cueL = $('cueL'), cueR = $('cueR'), dockAction = $('dockAction');
   var focusStatus = $('focusStatus'), sceneEl = $('scene'), appearanceEl = $('appearance'), appearanceRows = $('appearanceRows'), appearanceDesc = $('appearanceDesc');
   var appearanceBack = $('appearanceBack'), appearanceTitle = $('appearanceTitle'), appearanceStatus = $('appearanceStatus');
@@ -1041,7 +1406,7 @@
   function render() {
     var t = top(), sheet = !!V[t.id].sheet, shown = wall(S.shown ? S.shown.wall : S.c.wall), palette = ADAPTIVE_INK[shown.id];
     var adaptive = applyAdaptiveInk(palette), tr = adaptive && palette.tr ? palette.tr.pol : shown.ut.tr, br = adaptive && palette.br ? palette.br.pol : shown.ut.br;
-    stage.className = 'stage bg-' + S.c.bg + ' l-' + S.c.layout + ' v-' + S.variant + ' m-' + (materialApplies() ? S.c.material : 'none') + ' f-' + S.c.focus + ' a-' + S.c.apps + ' u-' + S.c.controls + ' g-' + S.geom + ' tone-' + shown.tone + ' tr-' + tr + ' br-' + br + wallClasses(shown) + inkRungClasses(palette, adaptive) + ' at-' + t.id + ' font-' + homeFont() + (homeFont() !== 'manrope' ? ' font-custom' : '') + (S.fontSwitch ? ' is-font-switch' : '') + (adaptive ? ' has-adaptive-ink adaptive-tl-' + palette.tl.pol : '') + (!adaptive && shown.clockInk ? ' has-clock-ink' : '') + (!adaptive && shown.dockClockInk ? ' has-dock-clock-ink' : '') + (registeredMaterial(shown.id) ? ' registered-material' : '') + (sheet ? ' is-sheet' : '') + (S.reflow ? ' is-reflow' : '');
+    stage.className = 'stage bg-' + S.c.bg + ' l-' + S.c.layout + ' v-' + S.variant + ' m-' + (materialApplies() ? S.c.material : 'none') + ' f-' + S.c.focus + ' a-' + S.c.apps + ' u-' + S.c.controls + ' i-' + (S.c.inputStyle || 'both') + ' ns-' + (S.c.inputShelf || 'glass') + ' date-' + (S.c.showDate || 'off') + ' g-' + S.geom + ' tone-' + shown.tone + ' tr-' + tr + ' br-' + br + wallClasses(shown) + inkRungClasses(palette, adaptive) + ' at-' + t.id + ' font-' + homeFont() + (homeFont() !== 'manrope' ? ' font-custom' : '') + (S.fontSwitch ? ' is-font-switch' : '') + (adaptive ? ' has-adaptive-ink adaptive-tl-' + palette.tl.pol : '') + (!adaptive && shown.clockInk ? ' has-clock-ink' : '') + (!adaptive && shown.dockClockInk ? ' has-dock-clock-ink' : '') + (registeredMaterial(shown.id) ? ' registered-material' : '') + (sheet ? ' is-sheet' : '') + (S.reflow ? ' is-reflow' : '');
     if (!adaptive && shown.clockInk) stage.style.setProperty('--clock-ink', shown.clockInk);
     else stage.style.removeProperty('--clock-ink');
     if (!adaptive && shown.dockClockInk) stage.style.setProperty('--dock-clock-ink', shown.dockClockInk);
@@ -1069,10 +1434,40 @@
     return hs;
   }
 
+  function inputTileInner(port) {
+    var style = S.c.inputStyle || 'both', icon = resolvedInputIcon(port), branded = icon !== 'hdmi';
+    var showIcon = style !== 'text', showLabel = style !== 'icons' || !branded, html = '<span class="input-face">';
+    if (showIcon) html += '<img class="input-glyph" alt="" src="' + ICONS + 'inputs/' + icon + '.svg">';
+    if (showLabel) html += '<span class="input-name">' + esc(inputLabel(port)) + '</span>';
+    return html + '</span>';
+  }
+  function renderInputRow(t) {
+    var ports = visibleInputs(), focus = t.id === 'home' && t.f.zone === 'inports', list = S.c.layout === 'list';
+    var g = dockGeom(Math.max(1, S.c.home.length || 1));
+    var tileW = g.tw, tileH = g.th, gap = g.pitch - g.tw, pitch = tileW + gap, html = '';
+    var total = ports.length ? (ports.length - 1) * pitch + tileW : 0;
+    var origin = Math.round((1920 - total) / 2), top = g.y - tileH - 16;
+    if (list) {
+      inputRow.className = 'input-row is-empty';
+      inputRow.style.height = '0px';
+      setHTML(inputRow, '');
+      return;
+    }
+    if (t.id === 'home' && t.f.zone === 'inports' && !ports.length) t.f.zone = 'apps';
+    inputRow.className = 'input-row' + ((S.c.inputShelf || 'glass') === 'clear' ? ' is-clear' : '') + (ports.length ? '' : ' is-empty');
+    inputRow.style.top = top + 'px';
+    inputRow.style.height = tileH + 'px';
+    ports.forEach(function (port, i) {
+      var on = focus && (t.f.p || 0) === i, label = inputLabel(port);
+      html += '<button type="button" tabindex="-1" class="input-tile' + (on ? ' is-focus' : '') + '" style="width:' + tileW + 'px;height:' + tileH + 'px;transform:translate3d(' + (origin + i * pitch) + 'px,0,0)" data-z="inport" data-i="' + i + '" data-action="home.input.' + port + '" aria-label="' + esc(label) + '">' + inputTileInner(port) + '</button>';
+    });
+    setHTML(inputRow, html);
+  }
   function renderHome(t) {
     var hs = homeState(t);
     renderCaption(t, hs);
     renderUtils(hs);
+    renderInputRow(t);
     if (S.c.layout === 'list') renderList(hs);
     else { photoMode = null; renderDock(hs); }
     renderAppFocusName(hs);
@@ -1087,8 +1482,17 @@
     if (!metrics || !metrics.digitCell) return text;
     return text.replace(/[0-9]/g, function (digit) { return '<span class="clock-digit">' + digit + '</span>'; });
   }
+  function dateLine() {
+    var d, text;
+    if ((S.c.showDate || 'off') !== 'on') return '';
+    d = new Date();
+    try { text = d.toLocaleDateString(undefined, { month: 'long', day: 'numeric' }); }
+    catch (e) { text = ''; }
+    return text && !/^\s*$/.test(text) ? text : '';
+  }
   function renderCaption(t, hs) {
-    var html = '<span class="clock">' + clockHtml() + '</span>';
+    var html = '<span class="clock">' + clockHtml() + '</span>', date = dateLine();
+    if (date) html += '<span class="cap-meta">' + esc(date) + '</span>';
     if (S.c.apps !== 'icons' && hs.items[hs.i] && (S.c.layout === 'list' ? photoLabel(hs.items[hs.i].id, false).size < 88 || photoLabel(hs.items[hs.i].id, false).ellipsis : hs.zone === 'apps' && reducedDockLabel(hs.items[hs.i].id))) html += '<span class="cap-line full-name">' + esc(app(hs.items[hs.i].id).name) + '</span>';
     setHTML(caption, html);
   }
@@ -1202,8 +1606,8 @@
     var a, body;
     if (it.kind === 'add') return '<span class="add">' + icon('plus') + '</span><span class="label">' + (full ? 'Home is full' : 'Add app') + '</span>';
     a = app(it.id);
-    body = S.c.apps === 'text' ? '' : appMark(a, S.c.apps === 'icons' ? 136 : 120, S.c.apps === 'icons' ? 88 : 72, S.c.apps === 'icons' ? 72 : 58);
-    return body + (S.c.apps === 'icons' ? '' : '<span class="label" style="font-size:' + dockLabelSize(a.id) + 'px;top:' + ((S.c.apps === 'text' ? 28 : 128) + fontShift('primary', dockLabelSize(a.id))) + 'px"><span class="label-ink">' + esc(a.name) + '</span></span>') + '<span class="nudge nudge-l">' + icon('left') + '</span><span class="nudge nudge-r">' + icon('right') + '</span>';
+    body = S.c.apps === 'text' ? '' : appMark(a, 120, 72, S.c.apps === 'icons' ? 56 : 58, true);
+    return body + (S.c.apps === 'icons' ? '' : '<span class="label" style="font-size:' + dockLabelSize(a.id) + 'px;' + (S.c.apps === 'text' || artworkSrc(a) ? '' : 'top:' + (104 + fontShift('primary', dockLabelSize(a.id))) + 'px;') + (S.c.apps === 'text' ? 'top:' + (32 + fontShift('primary', dockLabelSize(a.id))) + 'px;' : '') + '"><span class="label-ink">' + esc(a.name) + '</span></span>') + '<span class="nudge nudge-l">' + icon('left') + '</span><span class="nudge nudge-r">' + icon('right') + '</span>';
   }
   /* A wide label can reach the shelf before its icon. Check the rendered icon box,
      including during the track's 180ms transition, so both disappear together. */
@@ -1231,7 +1635,7 @@
     var tileFocus = hs.zone === 'apps' || hs.zone === 'tiles', tileSel = hs.zone === 'util' || hs.zone === 'act' || hs.zone === 'ctl' || hs.zone === 'preview';
     var focusItem = items[anchor], s, ax, label, width;
 
-    dock.className = 'dock' + (empty ? ' is-empty' : '');
+    dock.className = 'dock' + (empty ? ' is-empty' : '') + (S.c.shelf === 'clear' ? ' is-clear' : '');
     dock.style.left = g.x + 'px'; dock.style.top = g.y + 'px'; dock.style.width = g.w + 'px'; dock.style.height = g.h + 'px';
     dock.style.setProperty('--tile-w', g.tw + 'px'); dock.style.setProperty('--tile-h', g.th + 'px'); dock.style.setProperty('--dock-h', g.h + 'px');
     dock.style.setProperty('--nudge-top', ((g.th - 48) / 2) + 'px');
@@ -1248,8 +1652,11 @@
       var lifted = hs.lifted && i === anchor, partial = g.broad && (left - off < -1 || left + g.tw - off > g.shelf + 1);
       setContent(el, it.kind + '|' + (it.id || '') + '|' + (it.id ? dockLabelSize(it.id) : full) + '|' + S.c.bg + '|' + S.c.apps + '|' + homeFont(), function () { return '<span class="tile-content">' + dockTileHtml(it, full) + '</span>'; });
       el.className = 'tile k-' + it.kind + (focus ? ' is-focus' : '') + (sel ? ' is-sel' : '') + (lifted ? ' is-lifted' : '') + (partial ? ' is-partial' : '')
-        + (a && !a.mark ? ' is-text' : '') + (it.kind === 'add' && full ? ' is-full' : '') + (it.kind === 'app' && S.press === it.id ? ' is-press' : '')
+        + (a && !a.mark && !artworkSrc(a) ? ' is-text' : '') + (a && S.c.apps !== 'text' && artworkSrc(a) ? ' has-art' : '') + (a && S.c.apps !== 'text' && !a.icon && plateId(a) ? ' has-plate' : '')
+        + (it.kind === 'add' && full ? ' is-full' : '') + (it.kind === 'app' && S.press === it.id ? ' is-press' : '')
         + (lifted && i === 0 ? ' no-l' : '') + (lifted && i >= ns - 1 ? ' no-r' : '');
+      if (a && S.c.apps !== 'text' && !a.icon && PLATE_COLOR[plateId(a)]) el.style.setProperty('--art-plate', PLATE_COLOR[plateId(a)]);
+      else el.style.removeProperty('--art-plate');
       el.style.transform = 'translate3d(' + left + 'px,0,0)';
       el.setAttribute('role', 'button');
       if (a) el.setAttribute('aria-label', a.name);
@@ -1327,27 +1734,62 @@
     el.style.transformOrigin = (x + width / 2) + 'px ' + (y + height / 2) + 'px';
     el.style.transform = 'translate3d(' + (-x) + 'px,' + (-y) + 'px,0)' + (S.c.bg === 'photo' && S.c.material === 'tint' && !REDUCED_MOTION ? ' scale(1.04)' : '');
   }
+  function inputPlateWidth(port, compact) {
+    var text, size, width;
+    if (S.c.apps === 'icons') return compact ? 168 : 248;
+    text = S.c.apps === 'text';
+    size = compact ? 56 : 88;
+    width = textWidth(inputLabel(port), size, 600, -1.8, 'display');
+    return clamp(Math.ceil(Math.min(compact ? 640 : 992, width) + (text ? 84 : compact ? 156 : 184)), text ? 280 : 360, text ? compact ? 724 : 1076 : compact ? 796 : 1176);
+  }
   function renderList(hs) {
     var items = hs.items, n = items.length, compact = hs.mode === 'arrange', pitch = compact ? PH_COMPACT_PITCH : PH_PITCH;
-    var anchor = clamp(hs.i, 0, Math.max(0, n - 1)), first, off, width, slot, y, s, label, aw, plateState;
+    var ports = compact ? [] : visibleInputs(), lead = ports.length, total = lead + n;
+    var t = top(), inputFocus = !!(t && t.f && t.f.zone === 'inports' && lead);
+    var anchor = inputFocus ? clamp(t.f.p || 0, 0, lead - 1) : lead + clamp(hs.i, 0, Math.max(0, n - 1));
+    var first, off, width, slot, y, s, label, aw, plateState, rows;
     var rowFocus = hs.zone === 'apps' || hs.zone === 'tiles', remembered = hs.zone === 'util' || hs.zone === 'act' || hs.zone === 'ctl' || hs.zone === 'preview';
     photoModeTransition(compact);
     if (compact) {
       first = clamp(scroll.photoArrange, anchor - 7, anchor - 1);
-      first = clamp(first, 0, Math.max(0, n - PH_COMPACT_VISIBLE));
+      first = clamp(first, 0, Math.max(0, total - PH_COMPACT_VISIBLE));
       scroll.photoArrange = first;
+    } else if (hs.zone === 'preview' && anchor <= lead + 2) {
+      first = 0; scroll.photo = 0;
     } else {
       first = clamp(scroll.photo, anchor - 3, anchor - 1);
-      first = clamp(first, 0, Math.max(0, n - PH_FULL));
+      first = clamp(first, 0, Math.max(0, total - PH_FULL));
       scroll.photo = first;
     }
     off = first * pitch; slot = anchor - first;
-    width = items[anchor] ? listPlateWidth(items[anchor].id, compact) : 360;
+    width = inputFocus ? inputPlateWidth(ports[anchor], compact) : (items[anchor - lead] ? listPlateWidth(items[anchor - lead].id, compact) : 360);
     phList.className = 'ph-list' + (compact ? ' is-compact' : '');
     phList.style.height = PH_HEIGHT + 'px';
     phRows.style.top = (compact ? 72 : 148) + 'px';
-    keyed(phRows, items, function (row, it, i) {
-      var typography = photoLabel(it.id, compact), focus = rowFocus && i === anchor, lifted = hs.lifted && i === anchor, markImage, body = '';
+    rows = ports.map(function (port) { return { key: 'in:' + port, kind: 'input', port: port }; }).concat(items);
+    keyed(phRows, rows, function (row, it, i) {
+      var typography, focus, lifted, markImage, body, appIndex, labelText, markW, markH;
+      if (it.port) {
+        labelText = inputLabel(it.port);
+        markW = S.c.apps === 'icons' ? compact ? 64 : 88 : compact ? 60 : 84;
+        markH = S.c.apps === 'icons' ? compact ? 64 : 88 : compact ? 44 : 64;
+        setContent(row, 'in|' + it.port + '|' + labelText + '|' + resolvedInputIcon(it.port) + '|' + S.c.apps + '|' + S.c.inputStyle + '|' + homeFont(), function () {
+          body = '';
+          if (S.c.apps !== 'text') body += '<span class="mark" style="width:' + markW + 'px;height:' + markH + 'px"><img class="ph-input-glyph" alt="" src="' + ICONS + 'inputs/' + resolvedInputIcon(it.port) + '.svg"></span>';
+          if (S.c.apps !== 'icons') body += '<span class="ph-name" style="font-size:' + (compact ? 56 : 88) + 'px;top:' + (compact ? 10.66 : 9.68) + 'px">' + esc(labelText) + '</span>';
+          return '<span class="ph-group">' + body + '</span>';
+        });
+        row.className = 'ph-row k-input' + (inputFocus && i === anchor ? ' is-focus' : '');
+        row.style.width = (compact ? inputPlateWidth(it.port, compact) : 1200) + 'px';
+        row.style.height = pitch + 'px';
+        row.style.transform = 'translate3d(0,' + (i * pitch) + 'px,0)';
+        row.setAttribute('role', 'button');
+        row.setAttribute('aria-label', labelText);
+        attrs(row, 'inport', ports.indexOf(it.port), 'home.input.' + it.port);
+        return;
+      }
+      appIndex = i - lead;
+      typography = photoLabel(it.id, compact); focus = rowFocus && appIndex === hs.i; lifted = hs.lifted && appIndex === hs.i; body = '';
       setContent(row, it.id + '|' + typography.size + '|' + S.c.bg + '|' + S.c.apps + '|' + homeFont(), function () {
         if (S.c.apps !== 'text') body += appMark(app(it.id), S.c.apps === 'icons' ? compact ? 64 : 88 : compact ? 60 : 84, S.c.apps === 'icons' ? compact ? 64 : 88 : compact ? 44 : 64, S.c.apps === 'icons' ? compact ? 52 : 72 : compact ? 42 : 54);
         if (S.c.apps !== 'icons') body += '<span class="ph-name" style="font-size:' + typography.size + 'px;top:' + typography.top + 'px">' + esc(app(it.id).name) + '</span>';
@@ -1358,18 +1800,18 @@
         markImage.onerror = function () { this.style.visibility = 'hidden'; };
         if (markImage.complete && !markImage.naturalWidth) markImage.style.visibility = 'hidden';
       }
-      row.className = 'ph-row k-' + it.kind + (focus ? ' is-focus' : '') + (remembered && i === anchor ? ' is-sel' : '') + (lifted ? ' is-lifted' : '')
-        + (lifted && i === 0 ? ' no-up' : '') + (lifted && i === n - 1 ? ' no-down' : '')
+      row.className = 'ph-row k-' + it.kind + (focus ? ' is-focus' : '') + (remembered && appIndex === hs.i ? ' is-sel' : '') + (lifted ? ' is-lifted' : '')
+        + (lifted && appIndex === 0 ? ' no-up' : '') + (lifted && appIndex === n - 1 ? ' no-down' : '')
         + (it.kind === 'app' && S.press === it.id ? ' is-press' : '');
       row.style.width = (compact ? listPlateWidth(it.id, compact) : 1200) + 'px'; row.style.height = pitch + 'px';
       row.style.transform = 'translate3d(0,' + (i * pitch) + 'px,0)';
       row.setAttribute('role', 'button'); row.setAttribute('aria-label', app(it.id).name);
-      attrs(row, compact ? 'tile' : 'app', i, compact ? 'arrange.' + (it.kind === 'ph' ? 'placeholder.' : 'tile.') + it.id : 'home.app.' + it.id);
+      attrs(row, compact ? 'tile' : 'app', appIndex, compact ? 'arrange.' + (it.kind === 'ph' ? 'placeholder.' : 'tile.') + it.id : 'home.app.' + it.id);
     });
     phRows.style.transform = 'translate3d(0,' + (-off) + 'px,0)';
     y = (compact ? PH_COMPACT_TOP + 2 : PH_TOP + 1) + slot * pitch;
-    plateState = !n || hs.zone === null ? '' : hs.lifted ? 'on-lift' : S.c.focus === 'glass' && rowFocus ? 'on-focus' : S.c.focus === 'glass' && remembered ? 'on-sel' : '';
-    renderPhotoPlate(items[anchor] ? items[anchor].id : '', width, compact ? 88 : 134, y, plateState);
+    plateState = !total || hs.zone === null ? '' : hs.lifted ? 'on-lift' : S.c.focus === 'glass' && (rowFocus || inputFocus) ? 'on-focus' : S.c.focus === 'glass' && remembered ? 'on-sel' : '';
+    renderPhotoPlate(inputFocus ? 'input-' + ports[anchor] : (items[anchor - lead] ? items[anchor - lead].id : ''), width, compact ? 88 : 134, y, plateState);
     if (compact && !hs.lifted && (hs.zone === 'tiles' || hs.zone === 'act') && items[anchor]) {
       s = hs.arr.slots[anchor]; label = (s.removed ? 'Restore ' : 'Remove ') + app(s.id).name; aw = actionWidth(label);
       setHTML(phAction, '<span>' + esc(label) + '</span>');
@@ -1378,8 +1820,8 @@
       phAction.style.transform = 'translate3d(' + (112 + width + 24) + 'px,' + (PH_COMPACT_TOP + slot * pitch + 12) + 'px,0)';
       attrs(phAction, 'act', anchor, 'arrange.' + (s.removed ? 'restore.' : 'remove.') + s.id);
     } else { phAction.className = 'ph-action'; phAction.removeAttribute('data-z'); phAction.removeAttribute('data-action'); }
-    phEmpty.className = 'ph-empty' + (!compact && !n ? ' is-on' : '');
-    setHTML(phEmpty, !compact && !n ? '<p>No apps on Home</p><button type="button" tabindex="-1" class="btn' + (hs.zone === 'empty' ? ' is-focus' : '') + '" data-z="empty" data-i="0" data-action="home.add-apps">' + icon('plus') + '<span>Add apps</span></button>' : '');
+    phEmpty.className = 'ph-empty' + (!compact && !total ? ' is-on' : '');
+    setHTML(phEmpty, !compact && !total ? '<p>No apps on Home</p><button type="button" tabindex="-1" class="btn' + (hs.zone === 'empty' ? ' is-focus' : '') + '" data-z="empty" data-i="0" data-action="home.add-apps">' + icon('plus') + '<span>Add apps</span></button>' : '');
   }
 
   /* Sheets: a frame is built once per view/mode; fill() updates its slots. Persistent
@@ -1409,22 +1851,33 @@
     appearanceEl.className = 'appearance detail-' + t.group;
     appearanceRows.className = 'appearance-rows';
     appearanceTitle.textContent = DETAIL_NAMES[t.group];
-    var at = detailLocation(t), selected = at.item, error = S.lookError, status = '', hint;
+    var error = S.lookError, status = '';
     function command(item, inner, cls) {
-      var applied = item.axis && S.c[item.axis] === item.value;
+      var hasApplied = Object.prototype.hasOwnProperty.call(item, 'applied');
+      var applied = hasApplied ? !!item.applied : !!(item.axis && S.c[item.axis] === item.value);
       var loading = !!(item.axis && S.pending && S.pending.target[item.axis] === item.value && S.pending.row === item.axis);
+      var choiceName = item.aria || (item.axis && item.value === 'both' ? 'Icons and text' : item.label);
       return '<button type="button" tabindex="-1" class="setting-choice' + (cls ? ' ' + cls : '') + (t.f.action === item.action ? ' is-focus' : '') + (item.disabled ? ' is-disabled' : '') + (applied ? ' is-applied' : '') + (loading ? ' is-loading' : '') + '"'
-        + (item.axis ? ' role="radio" aria-checked="' + !!applied + '"' : '') + ' aria-label="' + esc(item.axis && item.value === 'both' ? 'Icons and text' : item.label) + '" aria-disabled="' + !!item.disabled + '" aria-busy="' + loading + '"'
+        + ((item.axis || hasApplied) ? ' role="radio" aria-checked="' + applied + '"' : '') + ' aria-label="' + esc(choiceName) + '" aria-disabled="' + !!item.disabled + '" aria-busy="' + loading + '"'
         + ' data-z="detail" data-i="0" data-id="' + item.action + '" data-action="' + item.action + '">' + inner
         + (item.axis ? '<span class="setting-tick" aria-hidden="true">' + (applied ? icon('check') : '') + '</span>' : '') + '</button>';
     }
     setHTML(appearanceBack, command({ action: 'settings.back', label: t.group === 'rotation' ? 'Background' : t.group === 'inputs' ? 'Samsung' : 'Settings' }, icon('left') + '<span>' + (t.group === 'rotation' ? 'Background' : t.group === 'inputs' ? 'Samsung' : 'Settings') + '</span>', 'setting-back'));
     setHTML(appearanceRows, detailSections(t).map(function (section) {
-      return '<section class="setting-section' + (section.horizontal ? ' is-horizontal' : '') + ' section-' + section.id + '">'
+      return '<section class="setting-section' + (section.horizontal ? ' is-horizontal' : '') + (section.compact ? ' is-compact' : '') + ' section-' + section.id + '">'
         + (section.title ? '<h3 class="setting-label" id="setting-' + section.id + '">' + section.title + '</h3>' : '')
-        + '<div class="setting-options"' + (section.items[0].axis ? ' role="radiogroup" aria-label="' + esc(section.title || LOOK_NAMES[section.id] || DETAIL_NAMES[t.group]) + '"' : '') + '>'
+        + '<div class="setting-options"' + ((section.items[0].axis || section.compact) ? ' role="radiogroup" aria-label="' + esc(section.caption || section.title || LOOK_NAMES[section.id] || DETAIL_NAMES[t.group]) + '"' : '') + '>'
+        + (section.caption ? '<span class="input-icon-name">' + esc(section.caption) + '</span>' : '')
         + section.items.map(function (item) {
-          var swatch = item.axis === 'bg', body = '';
+          var swatch = item.axis === 'bg', body = '', open, menu;
+          if (item.menu) {
+            open = t.iconMenu && t.iconMenu.port === item.menu;
+            menu = open ? '<div class="icon-menu is-up" role="listbox" aria-label="' + esc(item.label) + ' icon">' + INPUT_ICON_CHOICES.map(function (value) {
+              var pending = t.iconMenu.value === value, applied = inputIconChoice(item.menu) === value;
+              return '<button type="button" tabindex="-1" class="setting-choice icon-option' + (pending ? ' is-focus' : '') + (applied ? ' is-applied' : '') + '" role="option" aria-selected="' + pending + '" aria-label="' + esc(item.label + ' ' + inputIconLabel(value)) + '" data-z="detail" data-i="0" data-id="inputicon.' + item.menu + '.' + value + '" data-action="inputicon.' + item.menu + '.' + value + '"><span class="setting-name">' + esc(inputIconLabel(value)) + '</span>' + (applied ? '<span class="setting-tick" aria-hidden="true">' + icon('check') + '</span>' : '<span class="setting-tick" aria-hidden="true"></span>') + '</button>';
+            }).join('') + '</div>' : '';
+            return '<div class="icon-select' + (open ? ' is-open' : '') + '">' + command({ action: item.action, label: item.label, aria: item.label + ', ' + item.valueLabel }, '<span class="setting-copy"><span class="setting-name">' + esc(item.label) + '</span></span><span class="icon-select-value">' + esc(item.valueLabel) + icon('down') + '</span>', 'icon-select-row') + menu + '</div>';
+          }
           if (swatch || item.thumbnail) body += item.value === 'light' || item.value === 'dark'
             ? '<span class="setting-swatch swatch-' + item.value + '" aria-hidden="true"></span>'
             : '<img class="setting-swatch" src="' + WP + S.c.wall + '-thumb.jpg" alt="">';
@@ -1441,8 +1894,7 @@
         + command({ action: 'settings.retry', label: 'Try again' }, '<span>Try again</span>', 'setting-retry');
     }
     setHTML(appearanceStatus, status);
-    hint = selected.disabled ? '' : selected.action === 'settings.back' ? 'Return to ' + (t.group === 'rotation' ? 'Background' : t.group === 'inputs' ? 'Samsung' : 'Settings') : selected.action === 'settings.retry' ? 'Retry this change' : selected.axis ? 'Apply selected setting' : selected.action === 'background.wallpaper' ? 'Choose a wallpaper' : selected.action === 'background.rotation' ? 'Choose a rotation interval' : 'Open on the TV';
-    setHTML(appearanceDesc, hint ? '<span class="remote-key">OK</span><span>' + esc(hint) + '</span>' : '');
+    setHTML(appearanceDesc, '');
   }
   function renderWallpaper(t) {
     V.wallpaper.norm(t);
@@ -1451,7 +1903,7 @@
     appearanceRows.className = 'appearance-rows wallpaper-picker';
     setHTML(appearanceBack, '<button type="button" tabindex="-1" class="setting-choice setting-back' + (t.f.zone === 'back' ? ' is-focus' : '') + '" data-z="wall-back" data-action="wallpaper.back">' + icon('left') + '<span>Background</span></button>');
     setHTML(appearanceRows, '<div class="wallpaper-edge wallpaper-before" aria-hidden="true">' + icon('up') + '</div><div class="wallpaper-list" role="radiogroup" aria-label="Wallpaper"><div class="wallpaper-rows"></div></div><div class="wallpaper-edge wallpaper-after" aria-hidden="true">' + icon('down') + '</div>');
-    var rows = appearanceRows.querySelector('.wallpaper-rows'), shown = wall(S.wallShown) || wall(S.c.wall), candidate = WALLS[t.i], status, note, hint;
+    var rows = appearanceRows.querySelector('.wallpaper-rows'), shown = wall(S.wallShown) || wall(S.c.wall), candidate = WALLS[t.i], status, note;
     keyed(rows, WALLS.map(function (w) { return { key: w.id, wall: w }; }), function (row, item, i) {
       var visible = i >= t.top && i < t.top + WALL_VISIBLE, w = item.wall, image;
       setContent(row, w.id + '|' + visible, function () { return '<span class="wallpaper-thumb">' + (visible ? '<img src="' + WP + w.id + '-thumb.jpg" alt="">' : '') + '</span><span class="setting-copy"><span class="setting-name">' + esc(w.name) + '</span></span><span class="setting-tick" aria-hidden="true"></span>'; });
@@ -1477,9 +1929,7 @@
     status = '<p class="wallpaper-preview-name"><span>' + esc(shown.name) + '</span><span class="wallpaper-count">' + (wallIndex(shown.id) + 1) + ' of ' + WALLS.length + '</span></p><p class="wallpaper-preview-state' + (t.failedId ? ' setting-error' : '') + '">' + esc(note) + '</p>';
     if (t.failedId) status += '<button type="button" tabindex="-1" class="setting-choice setting-retry' + (t.f.zone === 'retry' ? ' is-focus' : '') + '" data-z="wall-retry" data-action="wallpaper.retry">Try again</button>';
     setHTML(appearanceStatus, status);
-    hint = t.f.zone === 'back' ? 'Return to Background' : t.f.zone === 'retry' ? 'Retry this photo' : 'Apply selected photo';
-    if (t.f.zone === 'photo' && candidate.id === S.c.wall && !S.pending && !t.failedId) hint = '';
-    setHTML(appearanceDesc, hint ? '<span class="remote-key">OK</span><span>' + hint + '</span>' : '');
+    setHTML(appearanceDesc, '');
   }
   /* Keep the retry or membership state on the focused control. The stage-level line
      shares its position without changing the control's identity or key behaviour. */
@@ -1531,11 +1981,13 @@
     },
     editor: function () {
       return '<h2 class="s-title">Apps on Home</h2><p class="s-sub" data-slot="sub"></p><div class="s-head" data-slot="head"></div>'
-        + '<p class="s-label z-home" data-slot="lh"></p><p class="s-label z-other">Not on Home</p>'
-        + '<div class="ed-home" data-slot="home"></div><div class="ed-order-break" data-slot="break">Then scroll</div><div class="ed-other-view" data-slot="ov"><div class="ed-other" data-slot="other"></div></div><div class="ed-origin" data-slot="origin"></div>'
-        + '<div class="row-cue editor-before" data-slot="otherBefore" aria-hidden="true">' + icon('up') + '</div><div class="row-cue editor-after" data-slot="otherAfter" aria-hidden="true">' + icon('down') + '</div>';
+        + '<p class="s-label z-home" data-slot="lh"></p><p class="s-label z-other" data-slot="rh">Not on Home</p>'
+        + '<div class="ed-home"><div class="ed-home-in" data-slot="home"></div></div><div class="ed-order-break" data-slot="break">Then scroll</div>'
+        + '<div class="ed-other-view" data-slot="ov"><div class="ed-other" data-slot="other"></div><div class="kb-panel" data-slot="keys" hidden></div></div><div class="ed-origin" data-slot="origin"></div>'
+        + '<div class="row-cue editor-before" data-slot="otherBefore" aria-hidden="true">' + icon('up') + '</div><div class="row-cue editor-after" data-slot="otherAfter" aria-hidden="true">' + icon('down') + '</div>'
+        + '<div class="row-cue home-before" data-slot="homeBefore" aria-hidden="true">' + icon('up') + '</div><div class="row-cue home-after" data-slot="homeAfter" aria-hidden="true">' + icon('down') + '</div>';
     },
-    settings: function () { return '<h2 class="s-title">Settings</h2><div class="settings-overview" data-slot="list"></div><p class="settings-overview-hint"><span class="remote-key">OK</span><span>Open selected group</span></p>'; },
+    settings: function () { return '<h2 class="s-title">Settings</h2><div class="settings-overview" data-slot="list"></div>'; },
     message: function (t) {
       var m = messageContent(t);
       return '<h2 class="msg-title">' + esc(m.title) + '</h2><p class="msg-line">' + esc(m.line) + '</p><p class="msg-note">' + esc(m.note) + '</p><div class="msg-acts" data-slot="acts"></div>';
@@ -1543,7 +1995,7 @@
   };
   function gridTileHtml(id) {
     var a = app(id), state = onHome(id) ? badge(true) + '<span>On Home</span>' : '';
-    return '<span class="panel-content">' + appMark(a, 120, 72, 58) + '<span class="label">' + esc(a.name) + '</span></span><span class="state">' + state + '</span>';
+    return '<span class="panel-content">' + appMark(a, 120, 72, 58, true) + '<span class="label">' + esc(a.name) + '</span></span><span class="state">' + state + '</span>';
   }
   var FILLS = {
     apps: function (t, el) {
@@ -1557,7 +2009,9 @@
       keyed(el.grid, items.map(function (id) { return { key: id, id: id }; }), function (tile, it, i) {
         var focus = f.zone === 'grid' && i === f.i;
         setContent(tile, [it.id, app(it.id).name, onHome(it.id)].join('|'), function () { return gridTileHtml(it.id); });
-        tile.className = 'gt' + (focus ? ' is-focus' : '');
+        tile.className = 'gt' + (artworkSrc(app(it.id)) ? ' has-art' : '') + (!app(it.id).icon && plateId(app(it.id)) ? ' has-plate' : '') + (focus ? ' is-focus' : '');
+        if (!app(it.id).icon && PLATE_COLOR[plateId(app(it.id))]) tile.style.setProperty('--art-plate', PLATE_COLOR[plateId(app(it.id))]);
+        else tile.style.removeProperty('--art-plate');
         tile.style.transform = 'translate3d(' + ((i % COLS) * GRID_COL) + 'px,' + (Math.floor(i / COLS) * GRID_ROW) + 'px,0)';
         tile.setAttribute('role', 'button'); tile.setAttribute('aria-label', app(it.id).name);
         attrs(tile, 'grid', i, 'apps.open.' + it.id);
@@ -1568,18 +2022,56 @@
       el.after.className = 'row-cue grid-after' + (rows - t.top > vis ? ' is-on' : '');
     },
     editor: function (t, el) {
-      var f = t.f, H = t.lifted ? t.lifted.order : S.c.home, O = otherGroups(), list = O.recent.concat(O.rest), full = S.c.home.length >= CAP;
-      var entries = [], ys = [], y = 0, yf, minTop, maxTop = 0, rowEnd, before = false, afterRows = false;
+      var f = t.f, H = editorOrder(t), ports = inputOrder(t), O = otherGroups(), list = O.recent.concat(O.rest), full = S.c.home.length >= CAP;
+      var entries = [], ys = [], y = 0, yf, minTop, maxTop = 0, rowEnd, before = false, afterRows = false, focusY = 0, contentEnd, moveLine = '', originY;
       var hint = catalog.error ? catalog.error : catalog.loading ? 'Loading installed apps…' : f.zone === 'head' && f.h === 0 ? undoCaption() : f.zone === 'home' && f.part === 'remove' ? (H.length <= 1 ? LAST : app(H[f.i]).name + ' stays installed.') : '';
-      setHTML(el.sub, editStatus(hint, t.lifted ? 'Moving ' + app(t.lifted.id).name + '. OK places it, Back puts it back.' : ''));
+      if (t.lifted && t.lifted.kind === 'input') moveLine = 'Moving ' + inputLabel(t.lifted.port) + '. OK places it, Back puts it back.';
+      else if (t.lifted) moveLine = 'Moving ' + app(t.lifted.id).name + '. OK places it, Back puts it back.';
+      else if (t.renaming) moveLine = 'Done saves this launcher name. Cancel discards it.';
+      if (f.zone === 'home' || (t.lifted && t.lifted.kind !== 'input')) focusY = editorHomeY(f.i);
+      else if (f.zone === 'inputs' || f.zone === 'keys' || (t.lifted && t.lifted.kind === 'input')) focusY = editorInputOrigin(H.length) + ED_SEP + f.p * ED_ROW;
+      if (f.zone === 'home' || f.zone === 'inputs' || f.zone === 'keys' || t.lifted) {
+        if (focusY < (t.homeTop || 0)) t.homeTop = focusY;
+        if (focusY + 96 > (t.homeTop || 0) + ED_VIEW) t.homeTop = focusY + 96 - ED_VIEW;
+      }
+      contentEnd = ports.length ? editorInputOrigin(H.length) + ED_SEP + ports.length * ED_ROW : (H.length ? editorHomeY(H.length - 1) + ED_ROW : 0);
+      t.homeTop = clamp(t.homeTop || 0, 0, Math.max(0, contentEnd - ED_VIEW));
+      setHTML(el.sub, editStatus(hint, moveLine));
       setHTML(el.head, headButtons([['undo', 'Undo', S.undo.length ? '' : 'is-idle', 'undo'], ['done', 'Done', '', 'check']], f.zone === 'head' ? f.h : -1, 'editor'));
       el.head.className = 's-head' + (f.zone === 'head' ? ' is-awake' : '');
-      setHTML(el.lh, 'On Home <span class="s-count">' + S.c.home.length + ' of ' + CAP + '</span>');
-      el['break'].className = 'ed-order-break' + (H.length > editorCut() ? ' is-on' : '');
+      setHTML(el.lh, 'Apps <span class="s-count">' + S.c.home.length + ' of ' + CAP + '</span>');
+      setHTML(el.rh, t.renaming ? 'Launcher name' : 'Not on Home');
+      el.home.parentNode.className = 'ed-home' + (t.homeTop + ED_VIEW < contentEnd - 1 ? ' is-more' : '');
+      el.home.style.transform = 'translate3d(0,' + (-t.homeTop) + 'px,0)';
+      el['break'].className = 'ed-order-break' + (H.length > editorCut() && t.homeTop < 8 ? ' is-on' : '');
       el['break'].style.top = (264 + editorCut() * ED_ROW) + 'px';
+      el.homeBefore.className = 'row-cue home-before' + (t.homeTop > 0 ? ' is-on' : '');
+      el.homeAfter.className = 'row-cue home-after' + (t.homeTop + ED_VIEW < contentEnd - 1 ? ' is-on' : '');
 
-      keyed(el.home, H.map(function (id) { return { key: id, id: id }; }), function (row, it, i) {
-        var a = app(it.id), here = f.zone === 'home' && i === f.i, lifted = !!t.lifted && i === f.i;
+      keyed(el.home, H.map(function (id) { return { key: id, id: id }; }).concat(ports.length ? [{ key: 'inputs-label', sep: 'Inputs' }].concat(ports.map(function (port) { return { key: 'in:' + port, port: port }; })) : []), function (row, it) {
+        var a, here, lifted, pi, i;
+        if (it.sep) {
+          setContent(row, 'sep|Inputs', function () { return 'Inputs'; });
+          row.className = 'eo-sep';
+          row.style.transform = 'translate3d(0,' + editorInputOrigin(H.length) + 'px,0)';
+          row.removeAttribute('data-action');
+          return;
+        }
+        if (it.port) {
+          pi = ports.indexOf(it.port); here = f.zone === 'inputs' && pi === f.p; lifted = !!(t.lifted && t.lifted.kind === 'input' && pi === f.p);
+          setContent(row, 'in|' + it.port + '|' + inputLabel(it.port) + '|' + resolvedInputIcon(it.port), function () { return '<div class="er-name" role="button"><span class="panel-content"><span class="er-num"></span><img class="input-glyph" alt="" src="' + ICONS + 'inputs/' + resolvedInputIcon(it.port) + '.svg"><span class="er-text">' + esc(inputLabel(it.port)) + '</span><span class="er-move">' + icon('updown') + '</span></span></div><div class="er-rm" role="button"><span></span></div>'; });
+          row.className = 'er' + (here ? ' is-active' : '') + (lifted ? ' is-lifted' : '') + (isInputHidden(it.port) ? ' is-hidden' : '');
+          row.style.transform = 'translate3d(' + (lifted ? 16 : 0) + 'px,' + (editorInputOrigin(H.length) + ED_SEP + pi * ED_ROW) + 'px,0)';
+          row.querySelector('.er-num').textContent = String(pi + 1);
+          row.firstChild.className = 'er-name' + (here && (f.part === 'name' || lifted) ? ' is-focus' : '');
+          row.firstChild.setAttribute('aria-label', inputLabel(it.port));
+          row.lastChild.className = 'er-rm' + (here && f.part === 'hide' && !lifted ? ' is-focus' : '');
+          row.lastChild.firstChild.textContent = isInputHidden(it.port) ? 'Show' : 'Hide';
+          attrs(row.firstChild, 'iname', pi, 'editor.input.move.' + it.port);
+          attrs(row.lastChild, 'ihide', pi, 'editor.input.hide.' + it.port);
+          return;
+        }
+        i = H.indexOf(it.id); a = app(it.id); here = f.zone === 'home' && i === f.i; lifted = !!(t.lifted && t.lifted.kind !== 'input' && i === f.i);
         setContent(row, it.id, function () { return '<div class="er-name" role="button"><span class="panel-content"><span class="er-num"></span>' + smallMark(a) + '<span class="er-text">' + esc(a.name) + '</span><span class="er-move">' + icon('updown') + '</span></span></div><div class="er-rm" role="button"><span></span></div>'; });
         row.className = 'er' + (here ? ' is-active' : '') + (lifted ? ' is-lifted' : '');
         row.style.transform = 'translate3d(' + (lifted ? 16 : 0) + 'px,' + editorHomeY(i) + 'px,0)';
@@ -1590,8 +2082,9 @@
         attrs(row.firstChild, 'name', i, 'editor.move.' + it.id);
         attrs(row.lastChild, 'remove', i, 'editor.remove.' + it.id);
       });
-      el.origin.className = 'ed-origin' + (t.lifted && t.lifted.from !== f.i ? ' is-on' : '');
-      if (t.lifted) el.origin.style.transform = 'translate3d(0,' + (264 + editorHomeY(t.lifted.from) + 16) + 'px,0)';
+      originY = t.lifted ? (t.lifted.kind === 'input' ? editorInputOrigin(S.c.home.length) + ED_SEP + t.lifted.from * ED_ROW : editorHomeY(t.lifted.from)) : 0;
+      el.origin.className = 'ed-origin' + (t.lifted && t.lifted.from !== (t.lifted.kind === 'input' ? f.p : f.i) ? ' is-on' : '');
+      if (t.lifted) el.origin.style.transform = 'translate3d(0,' + (264 + originY - t.homeTop + 16) + 'px,0)';
 
       if (O.recent.length) { entries.push({ key: 'sep-recent', sep: 'Recently removed', y: y }); y += ED_SEP; }
       O.recent.forEach(function (id) { entries.push({ key: id, id: id, y: y }); ys.push(y); y += ED_ROW; });
@@ -1609,6 +2102,7 @@
       t.top = clamp(t.top, 0, maxTop);
       keyed(el.other, entries, function (row, it) {
         var j, focus, a;
+        if (t.renaming) { row.style.visibility = 'hidden'; return; }
         row.style.transform = 'translate3d(0,' + it.y + 'px,0)';
         rowEnd = it.y + (it.sep ? ED_SEP : 72);
         row.style.visibility = it.y >= t.top && rowEnd <= t.top + ED_VIEW ? 'visible' : 'hidden';
@@ -1622,9 +2116,12 @@
         attrs(row, 'other', j, 'editor.add.' + it.id);
       });
       el.other.style.transform = 'translate3d(0,' + (-t.top) + 'px,0)';
+      el.other.style.visibility = t.renaming ? 'hidden' : '';
+      el.keys.hidden = !t.renaming;
+      if (t.renaming) setHTML(el.keys, kbPanelHtml(t));
       el.ov.className = 'ed-other-view';
-      el.otherBefore.className = 'row-cue editor-before' + (before ? ' is-on' : '');
-      el.otherAfter.className = 'row-cue editor-after' + (afterRows ? ' is-on' : '');
+      el.otherBefore.className = 'row-cue editor-before' + (!t.renaming && before ? ' is-on' : '');
+      el.otherAfter.className = 'row-cue editor-after' + (!t.renaming && afterRows ? ' is-on' : '');
     },
     settings: function (t, el) {
       var html = '';
@@ -1856,29 +2353,103 @@
   });
   stage.addEventListener('click', function (ev) {
     var el = ev.target;
+    if (suppressInputClick) { suppressInputClick = false; focusStage(); return; }
     while (el && el !== stage && !(el.getAttribute && el.getAttribute('data-z'))) el = el.parentNode;
     focusStage();
     if (!el || el === stage) return;
     pointAt(el);
   });
-  var heldKeys = {};
+  var heldKeys = {}, inputHold = null, suppressInputClick = false;
+  function clearInputHold() {
+    if (!inputHold) return;
+    clearTimeout(inputHold.timer);
+    inputHold = null;
+  }
+  function inputHoldFromKey() {
+    var t = top(), ports;
+    if (!t || t.renaming) return null;
+    if (t.id === 'home' && t.f.zone === 'inports') {
+      ports = visibleInputs();
+      return ports.length ? { port: ports[clamp(t.f.p || 0, 0, ports.length - 1)], origin: 'home' } : null;
+    }
+    if (t.id === 'editor' && t.f.zone === 'inputs' && t.f.part === 'name' && !t.lifted) {
+      ports = inputOrder(t);
+      return ports.length ? { port: ports[t.f.p], origin: 'editor' } : null;
+    }
+    return null;
+  }
+  function armInputHold(target, via) {
+    clearInputHold();
+    inputHold = { port: target.port, origin: target.origin, via: via, fired: false, timer: setTimeout(function () {
+      if (!inputHold || inputHold.fired) return;
+      inputHold.fired = true;
+      beginInputRename(inputHold.port, inputHold.origin === 'home');
+    }, INPUT_HOLD_MS) };
+  }
+  function actionEl(node) {
+    while (node && node !== stage && !(node.getAttribute && node.getAttribute('data-z'))) node = node.parentNode;
+    return node && node !== stage ? node : null;
+  }
   document.addEventListener('keydown', function (ev) {
-    var code = ev.keyCode, k = KEYS[code];
+    var code = ev.keyCode, k = KEYS[code], typing = top(), ch, target;
+    if (typing && typing.id === 'editor' && typing.renaming) {
+      if (code === 8) { ev.preventDefault(); typing.kbText = (typing.kbText || '').slice(0, -1); render(); return; }
+      ch = ev.key;
+      if (ch && ch.length === 1 && !ev.metaKey && !ev.ctrlKey && !ev.altKey) { ev.preventDefault(); kbInsert(typing, ch); render(); return; }
+    }
     if (code === 9) { ev.preventDefault(); return; }
     if (!k || ev.metaKey || ev.ctrlKey || ev.altKey) return;
     ev.preventDefault();
+    if (k === 'ok' && !ev.repeat) {
+      target = inputHoldFromKey();
+      if (target) { heldKeys[code] = true; armInputHold(target, 'key'); return; }
+    }
     if (k === 'ok' || k === 'back') { if (ev.repeat || heldKeys[code]) return; heldKeys[code] = true; }
     press(k);
   });
-  document.addEventListener('keyup', function (ev) { delete heldKeys[ev.keyCode]; });
-  window.addEventListener('blur', function () { heldKeys = {}; });
+  document.addEventListener('keyup', function (ev) {
+    var code = ev.keyCode, hold = inputHold;
+    if ((code === 13) && hold && hold.via === 'key') {
+      clearInputHold();
+      if (!hold.fired) {
+        if (hold.origin === 'home' && top().id === 'home' && top().f.zone === 'inports') perform(inputLabel(hold.port), function (done) { FrameDevice.setSource(hold.port, done); });
+        else if (hold.origin === 'editor' && top().id === 'editor' && !top().renaming && !top().lifted && top().f.part === 'name') press('ok');
+      }
+    }
+    delete heldKeys[code];
+  });
+  stage.addEventListener('pointerdown', function (ev) {
+    var el, t, port, ports;
+    if (ev.button && ev.button !== 0) return;
+    el = actionEl(ev.target);
+    if (!el) return;
+    t = top();
+    if (el.getAttribute('data-z') === 'inport' && t.id === 'home') {
+      ports = visibleInputs();
+      port = ports[+el.getAttribute('data-i')];
+      if (port) armInputHold({ port: port, origin: 'home' }, 'pointer');
+    } else if (el.getAttribute('data-z') === 'iname' && t.id === 'editor' && !t.lifted && !t.renaming) {
+      ports = inputOrder(t);
+      port = ports[+el.getAttribute('data-i')];
+      if (port) armInputHold({ port: port, origin: 'editor' }, 'pointer');
+    }
+  });
+  stage.addEventListener('pointerup', function () {
+    if (!inputHold || inputHold.via !== 'pointer') return;
+    if (inputHold.fired) suppressInputClick = true;
+    clearInputHold();
+  });
+  stage.addEventListener('pointercancel', function () { if (inputHold && inputHold.via === 'pointer') clearInputHold(); });
+  window.addEventListener('blur', function () { heldKeys = {}; clearInputHold(); });
   window.addEventListener('focus', function () { FrameDevice.cancelSource(); release(); refreshInputsOnReturn(); focusStage(); after(); updateClock(); });
   document.addEventListener('visibilitychange', function () {
     heldKeys = {};
+    clearInputHold();
     if (document.hidden) { FrameDevice.cancelSource(); pauseRotation(); clearTimeout(clockTimer); }
     else {
       release();
       if (S.c.bg === 'photo' && !S.pending && !S.previewBundle && (!committedBundle || S.bundleKey !== bundleKey(S.c))) setLook({}, { transient: true, startup: true });
+      startupCatalog();
       refreshInputsOnReturn(); after(); updateClock(); focusStage();
     }
   });
@@ -1914,9 +2485,15 @@
   QA.activate = function (action) { return activate(action) ? QA.state() : null; };
   QA.actions = function () { var view = isSettingsDetail(top()) ? appearanceEl : sheetEl.hidden ? homeEl : sheetEl; return Array.prototype.filter.call(view.querySelectorAll('[data-action]'), renderedAction).map(function (el) { return el.getAttribute('data-action'); }); };
 
+  function startupCatalog() {
+    if (document.hidden || catalog.loaded || catalog.loading) return;
+    refreshCatalog();
+  }
+
   /* ---------- Start ---------- */
   cueL.innerHTML = icon('left'); cueR.innerHTML = icon('right');
   initialise();
   setLook({}, { transient: true, startup: true });
   norm(); render(); fit(); focusStage(); updateClock(); syncRotation();
+  startupCatalog();
 })();

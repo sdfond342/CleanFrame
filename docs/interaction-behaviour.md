@@ -2,8 +2,8 @@
 
 ## Home
 
-- Dock: Left/Right scrolls the apps without wrapping. Up enters the top-right controls, starting with Art Mode or the last selected control. Left/Right moves between Art Mode, All apps and Settings. Down or Back returns to the selected app. The clock is at the top left.
-- List: Up/Down scrolls the apps without wrapping. Right enters the bottom-right controls, aligned with the clock above. Up/Down moves between Art Mode, All apps and Settings. Left or Back returns to the selected app. The list fades at both ends as it scrolls.
+- Dock: Left/Right scrolls the apps without wrapping. Up enters the separate HDMI row above the apps, then another Up enters the top-right controls, starting with All apps or the last selected control. Left/Right moves between All apps and Settings. Down from the HDMI row returns to the apps. Back from the app row opens a choice to stay or open Samsung Home. The clock is at the top left.
+- List: Up/Down scrolls the apps without wrapping. Inputs are rows in that same list, above the apps, using the same name and mark treatment. Up from the first app enters the last input. Down from the last input returns to the apps. Right enters the bottom-right controls, aligned with the clock above. Up/Down moves between All apps and Settings. Left or Back returns to the selected app. The list fades at both ends as it scrolls.
 - OK opens the selected item. Focus alone never launches an app.
 - Icons-only apps and controls reveal their names when focused. App presentation and control presentation are independent.
 - Back from the app list or Dock opens a choice to stay or open Samsung Home.
@@ -17,13 +17,13 @@ Settings opens a grouped overview: Background, Layout, Typography, Focus, Apps o
 | Group | Choices |
 | --- | --- |
 | Background | Photo, Light, Dark; Wallpaper and Rotation when Photo is active |
-| Layout | List or Dock; independent Text, Icons or Both choices for apps and Home controls |
+| Layout | List or Dock; Text, Icons or Both for apps, Home controls and the input row; Dock background and input background Glass or Clear; each input’s icon opens its own menu |
 | Typography | Manrope, Neue Montreal, Mori, Pangram Sans, Geist and Newsreader, when available |
-| Focus | Type or Glass; Soft, Frost or Clear tint material |
+| Focus | Type or Glass; Soft, Frost or Clear tint material; Date Off or On |
 | Apps on Home | Membership and arrangement editor |
 | Samsung | Samsung Home, TV settings and Inputs |
 
-Up/Down moves between rows. Left/Right moves between choices in a horizontal row. Focus alone changes neither the preview nor saved preferences in these appearance groups. Wallpaper has its own temporary photo preview, described below. OK applies the focused value. A checkmark identifies the applied value; the filled plate identifies remote focus. Applying the current value does not write again.
+Up/Down moves between rows. Left/Right moves between choices in a horizontal row. Focus alone changes neither the preview nor saved preferences in these appearance groups. Wallpaper has its own temporary photo preview, described below. OK applies the focused value. A checkmark identifies the applied value; the filled plate identifies remote focus. Applying the current value does not write again. Settings does not keep a footer that describes the OK action.
 
 Material applies to a photographic Dock, or Glass focus on a photographic List. Inactive material choices remain visible with an explanation and are skipped during navigation. Their stored value is retained. Wallpaper and rotation are also inactive on flat backgrounds.
 
@@ -43,10 +43,12 @@ The five-column grid scrolls with remote focus. OK launches an app; its On Home 
 
 ## Apps on Home
 
-Open the editor from Settings or All apps. On Home shows the current order on the left. Not on Home shows Recently removed first, followed by other installed apps on the right. Home holds one to nine apps.
+Open the editor from Settings or All apps. Apps shows the current order on the left, followed by the HDMI row in the same list. Not on Home shows Recently removed first, followed by other installed apps on the right. Home holds one to nine apps. The HDMI ports stay the four source numbers; only their order and launcher labels change.
 
-- Reorder: OK on an app name picks it up. Up/Down moves it. OK places it and saves the order. Back puts an unplaced app back without saving that move.
+- Reorder: OK on a name picks it up. Up/Down moves it inside its own group. OK places it and saves the order. Back puts an unplaced row back without saving that move.
 - Remove: Right from an app name reaches Remove from Home. OK saves the removal and moves focus to the same app in Recently removed. The app stays installed.
+- Rename: Hold OK on an input name, or hold a click on its home tile. The on-screen keyboard opens. Done saves that launcher label immediately. Cancel or Back discards only the unfinished name. A short OK still activates a visible home input. Holding OK does not switch the source when it is released, repeated, or when the keyboard closes.
+- Hide: Right from an input name reaches Hide or Show. Hiding keeps the port, order and launcher name, and removes that tile from the home row. Showing it puts the tile back. Hiding the last visible input leaves focus on the Home controls.
 - Add: OK on an app in Not on Home adds it and saves. A recently removed app returns to its previous position within the editing session; another app is added at the end. Focus follows the app to its Remove from Home control, so another OK can reverse the addition.
 - Undo reverses a completed addition, removal or reorder from the current editing session. Done or Back closes the editor and keeps completed changes. Undo history ends when the editor closes.
 
@@ -54,7 +56,9 @@ Removing the last Home app or adding a tenth app is prevented. A failed storage 
 
 ## Art Mode and Samsung screens
 
-Art Mode sends an application control to the installed `org.tizen.art-app`, with `mode=fullscreen` and `requester=mobile`. This aims to enter native Art Mode with its current artwork, without toggling power or changing the selected artwork.
+This launcher does not show an Art Mode control and does not send an Art Mode command. The television’s own Art Mode, if the set has one, is unchanged.
+
+The previous Frame launcher sent an application control to `org.tizen.art-app`, with `mode=fullscreen` and `requester=mobile`. That control is not offered here.
 
 This mode comes from [research on Samsung's Art app](https://github.com/TheFab21/ha-samsungtv-smart/blob/master/notes/QN55LS03FAFXZA/ART_MODE_DECOMPILED.md), on another Tizen 9 Frame model. It is an internal Samsung contract, not a documented public Art API. Its visible behaviour on this exact firmware must be confirmed on the TV.
 
@@ -66,7 +70,7 @@ Installed-app discovery allows up to 20 seconds for large TV catalogues; launch 
 
 ## HDMI inputs
 
-Settings → Samsung → Inputs opens the HDMI chooser. The adapter reads the TV’s actual connected and disconnected source records, including sleeping devices that may be listed as disconnected. It does not guess a universal port count or add a fourth default Home control. Missing APIs, denied access and discovery failure produce an unavailable/error state rather than invented ports. The active source comes from the synchronous `tvwindow.getSource()` return value.
+The launcher keeps HDMI1, HDMI2, Kodi and HDMI4 for public source numbers 1, 2, 3 and 4. Those labels are stored with the launcher and do not rename the television source. In the Dock they are a row of tiles above the apps, the same size and focus as the app tiles. Glass is the default input background; Clear removes that fill and keeps the focus plate. In the List, and in the List preview, each visible input is a row in the app list, above the apps, with the same mark and name treatment. Apps on Home reorders them with the same move controls as the apps. A short OK on a visible home input asks the public TV window API for that port number only after the TV reports it; a missing port stays an error. Holding OK renames the launcher label instead. Text, Icons and Both keep the port name and mark centred; a long name ellipsises and a short name stays centred. OK on an input’s icon row opens Auto, HDMI, Switch, Xbox, Xbox 360 and Kodi. Up and Down move the highlight, OK saves that choice immediately, and Back closes the menu without saving. Auto chooses a bundled Nintendo Switch, Xbox, Xbox 360 or Kodi mark from the label, with Xbox 360 taking precedence over Xbox, and uses a generic port mark otherwise. The marks are stored in the widget. Xbox 360 and the generic port mark are original drawings, not the owners' logos. A known app or installed icon is one picture covering the rounded tile. There is not a second copy of the logo on top. No live blur is applied. Settings → Samsung → Inputs still reads the live connected and disconnected records, including sleeping devices that may be listed as disconnected. It does not invent ports beyond what the TV returns. Missing APIs, denied access and discovery failure produce an unavailable/error state. The active source comes from the synchronous `tvwindow.getSource()` return value. Switching on this set still needs a device test.
 
 Up/Down selects an input. OK requests that exact source; Back returns to Samsung Settings. Retry after a failed load rereads the available sources. A routing error remains an error, and a failed handoff leaves the launcher usable. Timed-out or cancelled requests cannot start a later routing or viewer action; a native request already sent to the TV may itself be uncancellable.
 
@@ -91,7 +95,7 @@ The native Home operation and startup configuration from 19 October remain separ
 
 ## Clock and rendering
 
-Both layouts show the TV's local time in 12-hour format, without AM/PM or seconds. It updates at the minute boundary and on return to the launcher. No date or clock panel is shown.
+Both layouts show the TV's local time in 12-hour format, without AM/PM or seconds. It updates at the minute boundary and on return to the launcher. Focus can show the month and date under the clock, using the runtime locale and time zone. Date is off until chosen. The launcher does not show a temperature or weather conditions.
 
 Photographic materials and blurred panel backgrounds are generated before packaging and stay aligned with the full-screen image. Photo colour and contrast metadata are also prepared offline. Navigation does not sample image pixels, run an optics engine or apply live backdrop blur. Flat backgrounds use matching light or dark panel colours. Focus feedback uses transforms and opacity; reduced motion removes animated scaling and movement while retaining opacity feedback.
 

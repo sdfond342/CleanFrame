@@ -10,6 +10,7 @@ import re
 import zipfile
 from local_config import override_identity
 from private_files import check_widget, generated_path, private_path, secret_content
+from signing_checks import assert_no_reference_identity, runtime_identity_bytes
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_FONT_IDS = ['geist', 'newsreader']
@@ -87,6 +88,12 @@ def write_widget_archive(output, root=ROOT, include_private=True, identity=None)
                 raise ValueError('Private material in app source: ' + name)
             if name.startswith('assets/private-fonts/'):
                 raise ValueError('Private font binaries must stay in .local/, not app/.')
+            if identity is not None and name not in overlay and is_runtime_source(name):
+                payload = source.read_bytes()
+                replaced = runtime_identity_bytes(payload, identity)
+                if replaced != payload:
+                    overlay[name] = replaced
+                    continue
             if name not in overlay and is_runtime_source(name):
                 package.write(source, name)
         for name, source in sorted(overlay.items()):
@@ -95,4 +102,10 @@ def write_widget_archive(output, root=ROOT, include_private=True, identity=None)
             else:
                 package.writestr(name, source)
     check_widget(output)
+    if identity is not None:
+        try:
+            assert_no_reference_identity(output, identity)
+        except ValueError:
+            output.unlink()
+            raise
 

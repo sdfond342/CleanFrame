@@ -15,6 +15,7 @@ from font_assets import write_widget_archive
 from local_config import ROOT, load_settings, manifest_identity, override_identity, read_password
 import package
 from private_files import check_signed_widget, check_widget, generated_path, private_path, secret_content
+from signing_checks import path_key, preflight, verify_signatures, windows_path
 
 
 class ToolTests(unittest.TestCase):
@@ -272,7 +273,7 @@ with zipfile.ZipFile(target, 'a') as archive:
             self.assertEqual(manifest_identity(archive.read('config.xml')), identity)
 
     def test_public_check_reads_index_and_history(self):
-        for name in ['scripts/check-public.py', 'scripts/font_assets.py', 'scripts/local_config.py', 'scripts/private_files.py',
+        for name in ['scripts/check-public.py', 'scripts/font_assets.py', 'scripts/signing_checks.py', 'scripts/local_config.py', 'scripts/private_files.py',
                      'app/assets/fonts/SOURCES.json', 'app/assets/manrope.woff2', 'app/assets/manrope-OFL.txt',
                      'app/assets/fonts/geist/OFL.txt', 'app/assets/fonts/newsreader/OFL.txt']:
             target = self.root / name
@@ -390,6 +391,219 @@ with zipfile.ZipFile(target, 'a') as archive:
         self.assertFalse(private_path('signing.example.json'))
         self.assertTrue(secret_content(b'-----BEGIN ' + b'PRIVATE KEY-----'))
         self.assertTrue(secret_content(b'<pro' + b'files><profile' + b'item pass' + b'word="synthetic"/></profiles>'))
+
+    def test_linux_identity_profile_and_signature_presence(self):
+        secret = 'synthetic-profile-secret'
+        fresh = load_settings(self.root)
+        self.assertIsNone(fresh['profiles_path'])
+        self.assertIsNone(fresh['author_certificate'])
+        self.assertIsNone(fresh['distributor_certificate'])
+        self.assertIsNone(fresh['identity_evidence'])
+        self.assertEqual(fresh['identity']['app_id'], 'nClrkHome1.FrameHome')
+        outside = Path(tempfile.mkdtemp(prefix='cleanframe-private-'))
+        author = outside / 'author.p12'
+        distributor = outside / 'distributor.p12'
+        profiles = outside / 'profiles.xml'
+        evidence = outside / 'config.xml'
+        author.write_bytes(b'')
+        distributor.write_bytes(b'')
+        source = (self.root / 'app/config.xml').read_bytes()
+        evidence.write_bytes(
+            b'<?xml version="1.0" encoding="UTF-8"?>'
+            b'<widget xmlns:tizen="http://tizen.org/ns/widgets">'
+            b'<tizen:application id="AbCdEf1234.MyHome" package="AbCdEf1234" required_version="2.3"/>'
+            b'</widget>')
+        item = '<pro' + 'fileitem'
+        hidden = ' pass' + 'word="' + secret + '"'
+        profiles.write_bytes((
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<pro' + 'files active="SyntheticTV">'
+            '<pro' + 'file name="SyntheticTV">'
+            + item + ' distributor="0" key="' + str(author) + '"' + hidden + '/>'
+            + item + ' distributor="1" key="' + str(distributor) + '"' + hidden + '/>'
+            '</pro' + 'file></pro' + 'files>').encode())
+        original_profile = profiles.read_bytes()
+        evidence_bytes = evidence.read_bytes()
+        self.config(profile='SyntheticTV', sdk_path=str(self.root / '.local/sdk'),
+                    package_id='AbCdEf1234', app_id='AbCdEf1234.MyHome',
+                    profiles_path=str(profiles), author_certificate=str(author),
+                    distributor_certificate=str(distributor), identity_evidence=str(evidence))
+        lines = preflight(load_settings(self.root), self.root, platform='posix')
+        report = '\n'.join(lines)
+        self.assertIn('Own package id: AbCdEf1234', report)
+        self.assertIn('Own application id: AbCdEf1234.MyHome', report)
+        self.assertIn('Evidence required_version: 2.3', report)
+        self.assertIn('Packaged required_version: 5.0', report)
+        self.assertIn('Evidence file modified: no', report)
+        self.assertIn('Profile active: SyntheticTV', report)
+        self.assertIn('Author certificate path: match', report)
+        self.assertIn('Distributor certificate path: match', report)
+        self.assertIn('Author certificate file: present', report)
+        self.assertNotIn(secret, report)
+        self.assertNotIn('nClrkHome1', report)
+        self.assertEqual(profiles.read_bytes(), original_profile)
+        self.assertEqual(evidence.read_bytes(), evidence_bytes)
+        self.assertEqual((self.root / 'app/config.xml').read_bytes(), source)
+        self.assertEqual(path_key('C:/certs/author.p12', 'nt'), path_key('C:\\certs\\author.p12', 'nt'))
+        self.assertFalse(windows_path('/tmp/author.p12'))
+        self.assertTrue(windows_path('C:/certs/author.p12'))
+        windows_profile = outside / 'windows-profiles.xml'
+        windows_profile.write_bytes(original_profile.replace(str(author).encode(), b'C:\\certs\\author.p12'))
+        self.config(profile='SyntheticTV', sdk_path=str(self.root / '.local/sdk'),
+                    package_id='AbCdEf1234', app_id='AbCdEf1234.MyHome',
+                    profiles_path=str(windows_profile), author_certificate=str(author),
+                    distributor_certificate=str(distributor))
+        with self.assertRaisesRegex(ValueError, 'Windows certificate path') as windows_result:
+            preflight(load_settings(self.root), self.root, platform='posix')
+        self.assertNotIn(secret, str(windows_result.exception))
+        self.assertIsNone(windows_result.exception.__cause__)
+        self.config(profile='SyntheticTV', sdk_path=str(self.root / '.local/sdk'),
+                    profiles_path=str(profiles), author_certificate=str(author),
+                    distributor_certificate=str(distributor))
+        with self.assertRaisesRegex(ValueError, 'reference installation') as reference_result:
+            preflight(load_settings(self.root), self.root, platform='posix')
+        self.assertNotIn(secret, str(reference_result.exception))
+        broken = outside / 'broken-profiles.xml'
+        broken.write_bytes(b'<pro' + b'files ' + secret.encode() + b'<')
+        self.config(profile='SyntheticTV', sdk_path=str(self.root / '.local/sdk'),
+                    package_id='AbCdEf1234', app_id='AbCdEf1234.MyHome',
+                    profiles_path=str(broken), author_certificate=str(author),
+                    distributor_certificate=str(distributor))
+        with self.assertRaisesRegex(ValueError, 'not valid XML') as broken_result:
+            preflight(load_settings(self.root), self.root, platform='posix')
+        self.assertNotIn(secret, str(broken_result.exception))
+        self.assertIsNone(broken_result.exception.__cause__)
+        with self.assertRaisesRegex(ValueError, 'outside app/'):
+            self.config(profile='SyntheticTV', sdk_path=str(self.root / '.local/sdk'),
+                        package_id='AbCdEf1234', app_id='AbCdEf1234.MyHome',
+                        identity_evidence=str(self.root / 'app/config.xml'))
+            preflight(load_settings(self.root), self.root, platform='posix')
+        tracked_script = (ROOT / 'app/device.js').read_bytes()
+        self.assertIn(b"var SELF = 'nClrkHome1.FrameHome';", tracked_script)
+        (self.root / 'app/device.js').write_bytes(tracked_script)
+        cli = self.root / '.local/sdk/tools/ide/bin/tizen'
+        cli.parent.mkdir(parents=True)
+        marker = outside / 'cli-called'
+        cli.write_text('#!' + sys.executable + '\n' + '''
+from pathlib import Path
+import shutil, sys, zipfile
+Path(''' + repr(str(marker)) + ''').write_text('called')
+source = Path(sys.argv[-1])
+target = Path(sys.argv[sys.argv.index('-o') + 1]) / source.name
+shutil.copyfile(source, target)
+with zipfile.ZipFile(target, 'a') as archive:
+    archive.writestr('author-signature.xml', '<Signature/>')
+    archive.writestr('signature1.xml', '<Signature/>')
+''')
+        cli.chmod(0o700)
+        self.config(profile='SyntheticTV', sdk_path=str(cli.parents[3]),
+                    package_id='AbCdEf1234', app_id='AbCdEf1234.MyHome',
+                    profiles_path=str(profiles), author_certificate=str(author),
+                    distributor_certificate=str(distributor), identity_evidence=str(evidence))
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            package.main(self.root)
+        self.assertNotIn(secret, output.getvalue())
+        self.assertIn('Signed widget created:', output.getvalue())
+        self.assertEqual(profiles.read_bytes(), original_profile)
+        self.assertEqual((self.root / 'app/config.xml').read_bytes(), source)
+        with zipfile.ZipFile(self.root / 'dist/CleanFrame.wgt') as archive:
+            self.assertEqual(manifest_identity(archive.read('config.xml')),
+                             {'package_id': 'AbCdEf1234', 'app_id': 'AbCdEf1234.MyHome'})
+            self.assertNotIn(b'nClrkHome1', archive.read('config.xml'))
+            packaged_script = archive.read('device.js')
+            self.assertIn(b"var SELF = 'AbCdEf1234.MyHome';", packaged_script)
+            self.assertNotIn(b'nClrkHome1', packaged_script)
+        self.assertEqual((self.root / 'app/device.js').read_bytes(), tracked_script)
+        self.assertEqual((ROOT / 'app/device.js').read_bytes(), tracked_script)
+        signed = outside / 'presence.wgt'
+        signature = (
+            '<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">'
+            '<SignatureValue>bm90LWEtcmVhbC1zaWduYXR1cmU=</SignatureValue>'
+            '<KeyInfo><X509Data><X509Certificate>bm90LWEtcmVhbC1jZXJ0aWZpY2F0ZQ==</X509Certificate></X509Data></KeyInfo>'
+            '</Signature>')
+        own_config = evidence.read_bytes().replace(b'2.3', b'5.0')
+        with zipfile.ZipFile(signed, 'w') as archive:
+            archive.writestr('config.xml', own_config)
+            archive.writestr('author-signature.xml', signature)
+            archive.writestr('signature1.xml', signature)
+            archive.writestr('device.js', b'var SELF = "nClrkHome1.FrameHome";')
+        with self.assertRaisesRegex(ValueError, 'reference identity'):
+            package.main(self.root, ['--verify', str(signed)])
+        with zipfile.ZipFile(signed, 'w') as archive:
+            archive.writestr('config.xml', own_config)
+            archive.writestr('author-signature.xml', signature)
+            archive.writestr('signature1.xml', signature)
+            archive.writestr('device.js', b"var SELF = 'AbCdEf1234.MyHome';")
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            package.main(self.root, ['--verify', str(signed)])
+        verified = output.getvalue()
+        self.assertIn('Manifest package id: AbCdEf1234', verified)
+        self.assertIn('Reference manifest identity: no', verified)
+        self.assertIn('Reference runtime identity: absent', verified)
+        self.assertIn('author-signature.xml embedded certificate: present', verified)
+        self.assertIn('signature1.xml signature value: present', verified)
+        self.assertIn('Certificate presence is not identity proof', verified)
+        self.assertIn('Cryptographic validity: not_checked', verified)
+        self.assertNotIn(secret, verified)
+        with zipfile.ZipFile(signed, 'w') as archive:
+            archive.writestr('config.xml', evidence.read_bytes().replace(b'2.3', b'5.0'))
+            archive.writestr('author-signature.xml', '<Signature/>')
+            archive.writestr('signature1.xml', signature)
+        with self.assertRaisesRegex(ValueError, 'not cryptographic validity'):
+            verify_signatures(signed, {'package_id': 'AbCdEf1234', 'app_id': 'AbCdEf1234.MyHome'}, require_own=True)
+        script = (ROOT / 'scripts/package-own.sh').read_text()
+        self.assertIn('CLEANFRAME_REQUIRE_OWN_IDENTITY=1', script)
+        self.assertIn('scripts/package.py --verify', script)
+        windows_script = (ROOT / 'scripts/package-own.ps1').read_text()
+        for forbidden in ['native-home', 'sdb', 'vd_appinstall', 'vconf', 'security-profiles', 'Teegen', 'yPoFi7rWAI']:
+            self.assertNotIn(forbidden, script)
+            self.assertNotIn(forbidden, windows_script)
+            self.assertNotIn(forbidden, (ROOT / 'scripts/signing_checks.py').read_text())
+            self.assertNotIn(forbidden, (ROOT / 'scripts/package.py').read_text())
+
+    def test_generated_package_rejects_leftover_reference_id(self):
+        source_script = (ROOT / 'app/device.js').read_bytes()
+        (self.root / 'app/device.js').write_bytes(source_script)
+        (self.root / 'app/extra.js').write_text('var leftover = "nClrkHome1";\n')
+        identity = {'package_id': 'AbCdEf1234', 'app_id': 'AbCdEf1234.MyHome'}
+        output = self.root / 'leftover.wgt'
+        with self.assertRaisesRegex(ValueError, 'reference identity'):
+            write_widget_archive(output, root=self.root, include_private=False, identity=identity)
+        self.assertFalse(output.exists())
+        self.assertEqual((self.root / 'app/device.js').read_bytes(), source_script)
+        self.assertEqual((ROOT / 'app/device.js').read_bytes(), source_script)
+
+    def test_windows_launcher_keeps_password_off_the_command_line(self):
+        secret = b'synthetic password'
+        argv = [r'C:\tizen-studio\tools\ide\bin\tizen.bat', 'package', '-t', 'wgt', '-s', 'SyntheticTV',
+                '-o', r'C:\out', '--', r'C:\in.wgt']
+        command = package.windows_command_line(argv)
+        self.assertEqual(command[0], 'cmd.exe')
+        self.assertIn('tizen.bat', command[-1])
+        self.assertIn('-s', command[-1])
+        self.assertIn('SyntheticTV', command[-1])
+        self.assertNotIn(secret.decode(), command[-1])
+        cli = self.root / 'fake-tizen'
+        marker = self.root / 'argv.txt'
+        cli.write_text('#!' + sys.executable + '\n' + '''
+import sys
+from pathlib import Path
+Path(''' + repr(str(marker)) + ''').write_text('\\n'.join(sys.argv))
+print('Password:', end='', flush=True)
+if input() != 'synthetic password':
+    sys.exit(2)
+print('No: (N) ?', end='', flush=True)
+if input() != 'n':
+    sys.exit(2)
+''')
+        cli.chmod(0o700)
+        self.assertEqual(package.sign([str(cli), str(marker)], secret, platform='nt'), 0)
+        recorded = marker.read_text()
+        self.assertNotIn(secret.decode(), recorded)
+        self.assertNotIn('password', recorded.lower())
+        cli.write_text('#!' + sys.executable + '\nimport time\ntime.sleep(10)\n')
+        with self.assertRaisesRegex(ValueError, 'timed out'):
+            package.sign([str(cli)], platform='nt', timeout=0.2)
 
 
 if __name__ == '__main__':

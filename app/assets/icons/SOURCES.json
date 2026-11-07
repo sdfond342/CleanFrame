@@ -11,5 +11,10 @@
   "art": "CleanFrame original utility outline, 24px grid / 1.6px stroke",
   "apps": "CleanFrame original utility outline, 24px grid / 1.6px stroke",
   "settings": "CleanFrame original utility outline, 24px grid / 1.6px stroke",
-  "home": "CleanFrame original utility outline, 24px grid / 1.6px stroke"
+  "home": "CleanFrame original utility outline, 24px grid / 1.6px stroke",
+  "inputs/switch": "https://raw.githubusercontent.com/simple-icons/simple-icons/11.15.0/icons/nintendoswitch.svg (CC0; fill set to white)",
+  "inputs/xbox": "https://raw.githubusercontent.com/simple-icons/simple-icons/11.15.0/icons/xbox.svg (CC0; fill set to white)",
+  "inputs/kodi": "https://raw.githubusercontent.com/simple-icons/simple-icons/11.15.0/icons/kodi.svg (CC0; fill set to white)",
+  "inputs/xbox360": "CleanFrame original numeral mark. Simple Icons has no Xbox 360 drawing. This is not the Xbox 360 logo.",
+  "inputs/hdmi": "CleanFrame original port outline, 24px grid / 1.6px stroke. This is not the HDMI logo."
 }

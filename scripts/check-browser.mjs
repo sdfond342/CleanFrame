@@ -118,7 +118,7 @@ async function page(options = {}, setup) {
   current = await preview.browser.newPage({ viewport: { width: 1920, height: 1080 } });
   const owner = current;
   current.setDefaultTimeout(10000);
-  const expected = [];
+  const expected = Array.isArray(options.expectedFailures) ? options.expectedFailures.slice() : [];
   current.__expectedFailures = expected;
   current.on('pageerror', error => report.pageErrors.push({ section, error: error.message }));
   current.on('response', response => { if (response.status() >= 400 && !expected.some(s => response.url().includes(s))) report.pageErrors.push({ section, status: response.status(), url: response.url() }); });
@@ -149,7 +149,7 @@ async function group(name) {
 }
 const settingsSnapshot = () => current.evaluate(() => {
   const s = ShoreQA.state();
-  const rendered = [...document.getElementById('stage').classList].filter(c => /^(bg|l|a|u|f|m|font)-/.test(c)).sort();
+  const rendered = [...document.getElementById('stage').classList].filter(c => /^(bg|l|a|u|f|m|font|i)-/.test(c)).sort();
   return { stored: localStorage.getItem('cleanframe.home.v1'), committed: s.committed, shown: s.shown, rendered, writes: s.writes, storageAttempts: window.__storageAttempts };
 });
 const choice = (axis, value) => act('choice.' + axis + '.' + value);
@@ -324,6 +324,7 @@ try {
         const labels = await current.locator(layout === 'dock' ? '.tile-content' : '.ph-name').evaluateAll(elements => elements.filter(e => e.getClientRects().length).map(e => e.getBoundingClientRect().width));
         check(layout + ' labels retain width at ' + viewport.width, labels.length > 0 && labels.every(width => width > 0), labels);
         await nav(layout === 'dock' ? 'up' : 'right');
+        if (layout === 'dock') await nav('up');
         await current.waitForTimeout(240);
         check('Utility focus and rounded lens align at ' + viewport.width + ' in ' + layout, await current.evaluate(() => {
           const button = document.querySelector('.u.is-focus'), lens = document.querySelector('.ut-lens.is-current');
@@ -348,6 +349,7 @@ try {
         await look({ bg: 'photo', layout, controls, focus: 'glass', font: 'manrope' }); await scene('home');
         if ((await call('where')).zone === 'util') await nav('back');
         await nav(layout === 'dock' ? 'up' : 'right');
+        if (layout === 'dock') await nav('up');
         await nav(...Array(3).fill(layout === 'dock' ? 'left' : 'up'));
         await current.waitForTimeout(180);
         const spacing = await current.evaluate(({ layout, controls }) => {
@@ -361,9 +363,9 @@ try {
           });
         }, { layout, controls });
         check(layout + '/' + controls + ' uses spacing between visible children at ' + width,
-          spacing.length === 3 && spacing.every(s => s.children === (controls === 'both' ? 2 : 1) && Math.abs(s.extraWidth - s.gap) < .5), spacing);
+          spacing.length === 2 && spacing.every(s => s.children === (controls === 'both' ? 2 : 1) && Math.abs(s.extraWidth - s.gap) < .5), spacing);
         const focused = [];
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 2; i++) {
           if (i) await nav(layout === 'dock' ? 'right' : 'down');
           focused.push(await current.evaluate(() => {
             const button = document.querySelector('#utils .u.is-focus'), lens = document.querySelector('.ut-lens.is-current');
@@ -464,19 +466,309 @@ try {
     await current.evaluate(() => window.dispatchEvent(new Event('focus')));
     await scene('home'); await act('home.app.netflix'); await current.waitForFunction(() => __tv.calls.length === 2);
     check('Primary app keeps verified target', (await current.evaluate(() => __tv.calls.at(-1))).id === IDS[1]);
-    await current.evaluate(() => window.dispatchEvent(new Event('focus')));
-    await act('util.art'); await current.waitForFunction(() => __tv.calls.length === 3);
-    const art = await current.evaluate(() => __tv.calls.at(-1));
-    check('Art Mode uses app-control with fullscreen request', art.method === 'launchAppControl' && art.id === 'org.tizen.art-app' && art.control.data.some(d => d.key === 'mode' && d.value[0] === 'fullscreen'), art);
+    check('Launcher does not offer Art Mode', await current.locator('[data-action="util.art"]').count() === 0 && !(await current.locator('#utils').innerText()).includes('Art Mode'));
     await current.evaluate(() => window.dispatchEvent(new Event('focus'))); await group('samsung'); await act('samsung.home');
-    await current.waitForFunction(() => __tv.calls.length === 4);
+    await current.waitForFunction(() => __tv.calls.length === 3);
     check('Samsung escape keeps CSFS target', (await current.evaluate(() => __tv.calls.at(-1))).id === 'com.samsung.tv.csfs');
     await current.evaluate(() => window.dispatchEvent(new Event('focus'))); await group('samsung'); await act('samsung.settings');
-    await current.waitForFunction(() => __tv.calls.length === 5);
+    await current.waitForFunction(() => __tv.calls.length === 4);
     check('TV settings keeps installed target', (await current.evaluate(() => __tv.calls.at(-1))).id === 'com.samsung.tv.coba.setting');
     await current.evaluate(() => { window.dispatchEvent(new Event('focus')); __tv.launchFailure = true; });
     await scene('home'); await act('home.app.netflix'); await current.waitForFunction(() => ShoreQA.where().view === 'message');
     check('Launch failure is shown', /could not|unavailable|try again/i.test(await current.locator('#stage').innerText()));
+  });
+  await run('Separate HDMI row names, order and launcher-only rename', async () => {
+    await page();
+    const tiles = () => current.locator('#inputRow .input-tile').allTextContents();
+    const gap = await current.evaluate(() => {
+      const row = document.getElementById('inputRow').getBoundingClientRect();
+      const dock = document.getElementById('dock').getBoundingClientRect();
+      const tile = document.querySelector('#dock .tile');
+      const box = tile.getBoundingClientRect();
+      return { above: row.bottom <= dock.top + 1, separate: document.querySelectorAll('#dock .input-tile').length === 0, ratio: box.width / box.height, radius: parseFloat(getComputedStyle(tile).borderRadius) };
+    });
+    check('Input row starts HDMI1, HDMI2, Kodi, HDMI4', (await tiles()).join(',') === 'HDMI1,HDMI2,Kodi,HDMI4');
+    check('Input row sits above widescreen app tiles', gap.above && gap.separate && gap.ratio > 1.6 && gap.radius >= 20, gap);
+    await nav('up');
+    check('Up from the app row enters HDMI1', (await call('where')).focusAction === 'home.input.1' && (await call('where')).focusCount === 1);
+    await nav('right', 'right');
+    check('The third input is the launcher name Kodi', (await call('where')).focusAction === 'home.input.3' && (await call('where')).focus === 'Kodi');
+    const before = (await state()).writes;
+    await nav('ok');
+    await current.waitForFunction(() => __tv.calls.some(c => c.method === 'setSource'));
+    check('Kodi asks the public API for port 3', await current.evaluate(() => __tv.calls.at(-2).method === 'setSource' && __tv.calls.at(-2).number === 3 && __tv.calls.at(-1).id === 'org.tizen.tv-viewer'));
+    await current.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await editor();
+    check('Apps on Home keeps app move controls and has no separate input screen', await current.evaluate(() => !!document.querySelector('[data-action="editor.move.stremio"]') && !!document.querySelector('[data-action="editor.input.move.1"]') && !document.querySelector('[data-action^="inputrow."]')));
+    await act('editor.input.move.1'); await nav('down', 'ok');
+    check('Input reorder persists apart from the app row', (await stored()).inputs.join(',') === '2,1,3,4' && (await stored()).dock[0] === 'stremio');
+    const moved = (await stored()).inputs.join(',');
+    await act('editor.input.move.2'); await nav('down');
+    check('Unfinished input move does not write', (await stored()).inputs.join(',') === moved);
+    await nav('back');
+    check('Back puts the unplaced input back', (await stored()).inputs.join(',') === moved && (await call('where')).focusAction === 'editor.input.move.2');
+    await act('editor.input.move.3'); await nav('back');
+    await current.keyboard.down('Enter'); await current.waitForTimeout(650); await current.keyboard.up('Enter');
+    check('Rename opens the in-app keyboard without a text field', await current.evaluate(() => !document.querySelector('input, textarea') && !!document.querySelector('[data-action="editor.key.done"]')));
+    await current.keyboard.press('Backspace'); await current.keyboard.press('Backspace'); await current.keyboard.press('Backspace'); await current.keyboard.press('Backspace');
+    for (const letter of 'Cinema') await current.keyboard.press(letter);
+    await act('editor.key.done');
+    check('Done saves the launcher name and keeps port 3', (await stored()).inputNames['3'] === 'Cinema' && (await stored()).inputs.includes(3) && (await call('where')).focusAction === 'editor.input.move.3');
+    await current.keyboard.down('Enter'); await current.waitForTimeout(650); await current.keyboard.up('Enter');
+    await current.keyboard.press('Z');
+    await nav('back');
+    check('Back cancels only the unfinished rename', (await stored()).inputNames['3'] === 'Cinema' && !(await current.locator('#stage').innerText()).includes('Discard'));
+    await nav('back');
+    check('Editor Back leaves without a save prompt', (await call('where')).view === 'settings' && !(await current.locator('#stage').innerText()).match(/\bSave\b/));
+    await scene('home');
+    check('Home row shows the saved launcher label', (await tiles()).join(',') === 'HDMI2,HDMI1,Cinema,HDMI4');
+    const calls = await current.evaluate(() => __tv.calls.length);
+    await nav('up', 'right', 'right', 'right', 'ok');
+    await current.waitForFunction(() => ShoreQA.where().view === 'message');
+    check('A port the TV did not report is an error and does not switch', (await current.locator('#stage').innerText()).includes('no longer available') && await current.evaluate(start => __tv.calls.length === start, calls));
+    check('Input edits did not launch an app shortcut', (await state()).writes > before && (await stored()).home.join(',') === 'stremio,netflix,disneyplus,youtube,appletv,primevideo,abciview,sbs,applemusic');
+    for (const width of [1920, 1280]) {
+      await current.setViewportSize({ width, height: width * 9 / 16 });
+      await scene('home'); await look({ apps: 'both', layout: 'dock', shelf: 'glass' });
+      const shape = await current.evaluate(() => {
+        const tile = document.querySelector('#dock .tile'), input = document.querySelector('#inputRow .input-tile'), row = document.getElementById('inputRow'), dock = document.getElementById('dock');
+        const tr = tile.getBoundingClientRect(), ir = input.getBoundingClientRect(), rr = row.getBoundingClientRect(), dr = dock.getBoundingClientRect();
+        const imgs = [...tile.querySelectorAll('img')];
+        const scale = document.getElementById('stage').getBoundingClientRect().width / 1920;
+        const cover = imgs[0] ? imgs[0].getBoundingClientRect() : null;
+        return {
+          ratio: tr.width / tr.height, radius: parseFloat(getComputedStyle(tile).borderRadius), label: tile.getAttribute('aria-label'),
+          count: imgs.length, fit: imgs[0] ? getComputedStyle(imgs[0]).objectFit : '',
+          covers: !!(cover && Math.abs(cover.width - tr.width) < 3 && Math.abs(cover.height - tr.height) < 3),
+          gap: (dr.top - rr.bottom) / scale,
+          sameBox: Math.abs(tr.width - ir.width) < 1.5 && Math.abs(tr.height - ir.height) < 1.5 && getComputedStyle(tile).borderRadius === getComputedStyle(input).borderRadius
+        };
+      });
+      check('Home tiles stay rounded rectangles above the input row at ' + width, shape.ratio > 1.6 && shape.radius >= 20 && !!shape.label && shape.count === 1 && shape.fit === 'cover' && shape.covers && shape.gap >= 8 && shape.sameBox, shape);
+      await look({ layout: 'list' });
+      const listRows = await current.evaluate(() => {
+        const names = [...document.querySelectorAll('.ph-row.k-input .ph-name')].map(e => e.textContent.trim());
+        const appName = document.querySelector('.ph-row.k-app .ph-name');
+        const inputStyle = appName ? getComputedStyle(document.querySelector('.ph-row.k-input .ph-name')).fontSize : '';
+        const appStyle = appName ? getComputedStyle(appName).fontSize : '';
+        return { names, chips: document.querySelectorAll('#inputRow .input-tile').length, sameType: inputStyle && inputStyle === appStyle };
+      });
+      check('List shows inputs as app rows at ' + width, listRows.chips === 0 && listRows.names.join(',') === 'HDMI2,HDMI1,Cinema,HDMI4' && listRows.sameType, listRows);
+      await look({ layout: 'dock' });
+      await current.screenshot({ path: out + 'home-tiles-' + width + '.png' });
+      await look({ apps: 'icons' });
+      await current.screenshot({ path: out + 'home-icons-' + width + '.png' });
+      await look({ apps: 'both', shelf: 'clear' });
+      check('Clear dock keeps the tile focus plate', await current.evaluate(() => document.getElementById('dock').classList.contains('is-clear') && getComputedStyle(document.querySelector('#dock .plate')).visibility !== 'hidden'));
+      await current.screenshot({ path: out + 'dock-clear-' + width + '.png' });
+      await look({ shelf: 'glass' });
+      await editor();
+      await current.screenshot({ path: out + 'editor-apps-' + width + '.png' });
+      await nav(...Array(9).fill('down'));
+      await current.screenshot({ path: out + 'editor-inputs-' + width + '.png' });
+      await nav('ok');
+      await current.screenshot({ path: out + 'editor-moving-' + width + '.png' });
+      await nav('back');
+      await current.keyboard.down('Enter'); await current.waitForTimeout(650); await current.keyboard.up('Enter');
+      await current.screenshot({ path: out + 'editor-keyboard-' + width + '.png' });
+      await nav('back', 'back');
+    }
+  });
+  await run('Input hold, hide and local icons', async () => {
+    await page();
+    const glyph = port => current.evaluate(p => { const img = document.querySelector('[data-action="home.input.' + p + '"] img'); return img ? img.getAttribute('src') : ''; }, port);
+    check('A Kodi label uses the bundled Kodi mark', (await glyph(3)).endsWith('/inputs/kodi.svg'));
+    check('Unmatched HDMI labels use the generic mark', (await glyph(1)).endsWith('/inputs/hdmi.svg') && (await glyph(4)).endsWith('/inputs/hdmi.svg'));
+    check('Input marks are local files', await current.evaluate(() => !performance.getEntriesByType('resource').some(r => /simple-icons|raw\.githubusercontent/.test(r.name)) && performance.getEntriesByType('resource').some(r => r.name.includes('/assets/icons/inputs/kodi.svg'))));
+    await scene('settings');
+    check('Settings overview has no OK footer', await current.evaluate(() => !document.querySelector('.settings-overview-hint') && !/Open selected group/.test(document.getElementById('stage').innerText)));
+    await group('layout');
+    check('Layout has no OK footer', (await current.locator('#appearanceDesc').innerText()).trim() === '');
+    const iconWrites = (await state()).writes;
+    await act('inputmenu.3');
+    check('Icon menu opens on the saved choice', (await call('where')).focusAction === 'inputicon.3.auto' && await current.locator('.icon-menu .icon-option').count() === 6);
+    await nav('down');
+    check('Moving the icon highlight does not save', (await call('where')).focusAction === 'inputicon.3.hdmi' && (await state()).writes === iconWrites && !(await stored()).inputIcons['3']);
+    await nav('back');
+    check('Back closes the icon menu without saving', (await call('where')).focusAction === 'inputmenu.3' && !(await current.locator('.icon-menu').count()) && (await state()).writes === iconWrites);
+    await act('inputmenu.3');
+    await nav('down', 'down', 'ok');
+    await scene('home');
+    check('A manual icon overrides the name', (await glyph(3)).endsWith('/inputs/switch.svg') && (await stored()).inputIcons['3'] === 'switch' && (await stored()).inputNames['3'] == null);
+    await group('layout'); await act('inputmenu.3'); await nav('up', 'up', 'ok'); await scene('home');
+    check('Auto follows the Kodi name again', (await glyph(3)).endsWith('/inputs/kodi.svg') && !(await stored()).inputIcons['3']);
+    await nav('up', 'right');
+    const calls = await current.evaluate(() => __tv.calls.length);
+    await current.keyboard.down('Enter'); await current.keyboard.up('Enter');
+    await current.waitForFunction(() => __tv.calls.some(c => c.method === 'setSource' && c.number === 2));
+    check('A short OK switches only the focused port', await current.evaluate(start => __tv.calls.filter(c => c.method === 'setSource').length === 1 && __tv.calls.at(-2).number === 2 && __tv.calls.length === start + 2, calls));
+    await current.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await scene('home'); await nav('up');
+    const held = await current.evaluate(() => __tv.calls.length);
+    await current.keyboard.down('Enter');
+    await current.waitForTimeout(650);
+    await current.keyboard.up('Enter');
+    check('A held OK opens rename and never switches source', (await call('where')).view === 'editor' && (await current.locator('[data-action="editor.key.done"]').count()) === 1 && await current.evaluate(start => __tv.calls.length === start, held));
+    for (let i = 0; i < 5; i++) await current.keyboard.press('Backspace');
+    for (const letter of 'Xbox 360') await current.keyboard.press(letter);
+    await act('editor.key.done');
+    const savedRename = { where: await call('where'), name: (await stored()).inputNames, glyph: await glyph(2), calls: await current.evaluate(start => __tv.calls.length - start, held) };
+    check('Done saves immediately and returns without switching', savedRename.where.view === 'home' && savedRename.where.focusAction === 'home.input.2' && savedRename.name['2'] === 'Xbox 360' && savedRename.glyph.endsWith('/inputs/xbox360.svg') && savedRename.calls === 0, savedRename);
+    await current.locator('[data-action="home.input.2"]').hover();
+    await current.mouse.down(); await current.waitForTimeout(650); await current.mouse.up();
+    check('A long click opens rename and does not switch on release', (await call('where')).view === 'editor' && await current.evaluate(start => __tv.calls.length === start, held));
+    await current.keyboard.press('Escape');
+    check('Cancel from a long click drops the draft and stays on that input', (await call('where')).focusAction === 'home.input.2' && (await stored()).inputNames['2'] === 'Xbox 360' && await current.evaluate(start => __tv.calls.length === start, held));
+    const beforeClick = await current.evaluate(() => __tv.calls.filter(c => c.method === 'setSource').length);
+    await current.locator('[data-action="home.input.2"]').click();
+    await current.waitForFunction(start => __tv.calls.filter(c => c.method === 'setSource').length === start + 1, beforeClick);
+    await current.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await editor();
+    for (const port of [1, 2, 3, 4]) { await act('editor.input.move.' + port); await nav('back', 'right', 'ok'); }
+    check('Hiding every input keeps ports, order and names', (await stored()).inputs.join(',') === '1,2,3,4' && (await stored()).inputHidden.slice().sort().join(',') === '1,2,3,4' && (await stored()).inputNames['2'] === 'Xbox 360');
+    await nav('back'); await scene('home'); await nav('up');
+    check('Hiding the last input leaves focus on a Home control', (await call('where')).zone === 'util' && String((await call('where')).focusAction || '').startsWith('util.') && (await current.locator('#inputRow .input-tile').count()) === 0);
+    await editor(); await act('editor.input.move.2'); await nav('back', 'right', 'ok'); await nav('back'); await scene('home');
+    check('Showing an input restores its tile and saved name', (await current.locator('#inputRow .input-tile').allTextContents()).join(',') === 'Xbox 360' && (await stored()).inputs.includes(2) && (await stored()).inputNames['2'] === 'Xbox 360');
+  });
+  await run('Input tile centering, artwork fill and icon menu', async () => {
+    await page();
+    const align = async (style, focusPort) => {
+      await look({ layout: 'dock', apps: 'both', inputStyle: style, shelf: 'glass' });
+      await scene('home');
+      if (focusPort) { await nav('up'); for (let i = 1; i < focusPort; i++) await nav('right'); }
+      return current.evaluate(() => {
+        const scale = document.getElementById('stage').getBoundingClientRect().width / 1920;
+        const app = document.querySelector('#dock .tile');
+        return [...document.querySelectorAll('#inputRow .input-tile')].map(tile => {
+          const name = tile.querySelector('.input-name');
+          const icon = tile.querySelector('.input-glyph');
+          const face = tile.querySelector('.input-face');
+          const tr = tile.getBoundingClientRect();
+          const ar = app.getBoundingClientRect();
+          let textDelta = null;
+          if (name) {
+            const range = document.createRange();
+            range.selectNodeContents(name);
+            const rr = range.getBoundingClientRect();
+            textDelta = name.scrollWidth > name.clientWidth + 1 ? null : ((rr.left + rr.right) / 2 - (tr.left + tr.right) / 2) / scale;
+          }
+          const ir = icon ? icon.getBoundingClientRect() : null;
+          const nr = name ? name.getBoundingClientRect() : null;
+          let glyphsInside = true;
+          if (name && textDelta !== null) {
+            const range = document.createRange();
+            range.selectNodeContents(name);
+            const rr = range.getBoundingClientRect();
+            glyphsInside = rr.width > 0 && rr.left >= tr.left + 8 * scale && rr.right <= tr.right - 8 * scale;
+          }
+          return {
+            label: tile.getAttribute('aria-label'),
+            focused: tile.classList.contains('is-focus'),
+            textDelta, faceDelta: ((face.getBoundingClientRect().left + face.getBoundingClientRect().right) / 2 - (tr.left + tr.right) / 2) / scale,
+            iconRatio: ir ? ir.width / ir.height : null,
+            inside: (!nr || nr.left >= tr.left - 1 && nr.right <= tr.right + 1) && glyphsInside && (!ir || ir.left >= tr.left - 1 && ir.right <= tr.right + 1 && ir.top >= tr.top - 1 && ir.bottom <= tr.bottom + 1),
+            same: Math.abs(tr.width - ar.width) < 1.5 && Math.abs(tr.height - ar.height) < 1.5 && getComputedStyle(tile).borderRadius === getComputedStyle(app).borderRadius
+          };
+        });
+      });
+    };
+    for (const style of ['text', 'icons', 'both']) for (const focus of [false, true]) {
+      const rows = await align(style, focus ? 1 : 0);
+      const hdmi = rows.filter(row => /^HDMI\d$/.test(row.label));
+      const focusOk = focus ? rows[0].focused && rows.slice(1).every(row => !row.focused) : rows.every(row => !row.focused);
+      check(style + (focus ? ' focused' : ' resting') + ' centres HDMI labels', hdmi.length >= 3 && focusOk && hdmi.every(row => row.same && row.inside && Math.abs(row.faceDelta) < 2 && (row.textDelta === null || Math.abs(row.textDelta) < 3) && (row.iconRatio === null || Math.abs(row.iconRatio - 1) < 0.08)), rows);
+    }
+    await current.evaluate(() => {
+      const saved = JSON.parse(localStorage.getItem('cleanframe.home.v1'));
+      saved.inputNames = { 1: 'TV', 2: 'Living Room Projector', 3: 'HDMI3' };
+      localStorage.setItem('cleanframe.home.v1', JSON.stringify(saved));
+    });
+    await current.reload(); await ready();
+    await look({ layout: 'dock', apps: 'both', inputStyle: 'both' });
+    const named = await align('both', 0);
+    check('Short, HDMI and long names stay centred and inside the tile', named.map(row => row.label).join(',') === 'TV,Living Room Projector,HDMI3,HDMI4' && named.every(row => row.inside && Math.abs(row.faceDelta) < 2 && (row.textDelta === null || Math.abs(row.textDelta) < 4)), named);
+    await current.screenshot({ path: out + 'home-input-names-1920.png' });
+    await current.evaluate(() => {
+      const saved = JSON.parse(localStorage.getItem('cleanframe.home.v1'));
+      saved.inputNames = { 3: 'HDMI3' };
+      localStorage.setItem('cleanframe.home.v1', JSON.stringify(saved));
+    });
+    await current.reload(); await ready();
+    const filled = await current.evaluate(() => ['youtube', 'netflix', 'appletv'].map(id => {
+      const tile = document.querySelector('[data-action="home.app.' + id + '"]');
+      const imgs = [...tile.querySelectorAll('img')];
+      const box = tile.getBoundingClientRect();
+      const cover = imgs[0] ? imgs[0].getBoundingClientRect() : null;
+      return { id, count: imgs.length, src: imgs[0] && imgs[0].getAttribute('src'), fit: imgs[0] && getComputedStyle(imgs[0]).objectFit, covers: !!(cover && Math.abs(cover.width - box.width) < 3 && Math.abs(cover.height - box.height) < 3) };
+    }));
+    check('YouTube, Netflix and Apple TV use one covering picture', filled.every(item => item.count === 1 && item.src.includes('/plates/' + item.id + '.svg') && item.fit === 'cover' && item.covers), filled);
+    for (const width of [1920, 1280]) {
+      await current.setViewportSize({ width, height: width * 9 / 16 });
+      await scene('home'); await look({ apps: 'both', inputStyle: 'both', layout: 'dock' });
+      await current.screenshot({ path: out + 'home-input-both-' + width + '.png' });
+      await look({ inputStyle: 'text' });
+      await current.screenshot({ path: out + 'home-input-text-' + width + '.png' });
+      await look({ inputStyle: 'icons' });
+      await nav('up');
+      await current.screenshot({ path: out + 'home-input-icons-' + width + '.png' });
+      await look({ inputStyle: 'both', apps: 'icons' });
+      await current.screenshot({ path: out + 'home-art-icons-' + width + '.png' });
+      await look({ apps: 'both' });
+      await group('layout');
+      const menuFit = await current.evaluate(() => {
+        const stage = document.getElementById('stage').getBoundingClientRect();
+        const rows = [...document.querySelectorAll('.section-inputIcons .icon-select-row')].map(e => e.getBoundingClientRect());
+        return { count: rows.length, inside: rows.every(r => r.top >= stage.top + 4 && r.bottom <= stage.bottom - 4) };
+      });
+      check('Input icon rows fit the layout screen at ' + width, menuFit.count === 4 && menuFit.inside, menuFit);
+      await current.screenshot({ path: out + 'icon-menu-closed-' + width + '.png' });
+      await act('inputmenu.1');
+      const openFit = await current.evaluate(() => {
+        const stage = document.getElementById('stage').getBoundingClientRect();
+        const menu = document.querySelector('.icon-menu').getBoundingClientRect();
+        const options = [...document.querySelectorAll('.icon-menu .icon-option')].map(e => e.textContent.trim());
+        return { inside: menu.top >= stage.top + 4 && menu.bottom <= stage.bottom - 4 && menu.left >= stage.left && menu.right <= stage.right, options };
+      });
+      check('Open icon menu stays on screen at ' + width, openFit.inside && openFit.options.join(',') === 'Auto,HDMI,Switch,Xbox,Xbox 360,Kodi', openFit);
+      await current.screenshot({ path: out + 'icon-menu-open-' + width + '.png' });
+      await nav('back', 'back');
+    }
+    await current.setViewportSize({ width: 1920, height: 1080 });
+    await look({ layout: 'list', apps: 'both', showDate: 'on' });
+    await scene('home');
+    const lines = await current.evaluate(() => ({
+      date: (document.querySelector('.cap-meta') || {}).textContent || '',
+      weather: document.querySelectorAll('.cap-weather').length,
+      clock: document.querySelector('.clock').textContent.trim(),
+      listInputs: [...document.querySelectorAll('.ph-row.k-input')].map(e => e.getAttribute('aria-label')),
+      chips: document.querySelectorAll('#inputRow .input-tile').length
+    }));
+    check('Date uses the runtime calendar and no weather line is shown', /^\d{1,2}:\d{2}$/.test(lines.clock) && /\p{L}/u.test(lines.date) && /\d/.test(lines.date) && lines.weather === 0, lines);
+    check('List home keeps inputs in the app list', lines.chips === 0 && lines.listInputs.join(',') === 'HDMI1,HDMI2,HDMI3,HDMI4', lines);
+    await current.screenshot({ path: out + 'list-inputs-date-1920.png' });
+    await look({ layout: 'dock', inputShelf: 'clear', showDate: 'off' });
+    await scene('home'); await nav('up');
+    const clearFocus = await current.evaluate(() => {
+      const tile = document.querySelector('#inputRow .input-tile.is-focus');
+      const rest = document.querySelector('#inputRow .input-tile:not(.is-focus)');
+      const focus = tile ? getComputedStyle(tile) : null;
+      const plain = rest ? getComputedStyle(rest) : null;
+      return { saved: ShoreQA.state().look.inputShelf, rest: plain && plain.backgroundColor, focusImage: focus && focus.backgroundImage, focusShadow: focus && focus.boxShadow };
+    });
+    check('Clear input background keeps a visible focus plate', clearFocus.saved === 'clear' && clearFocus.rest === 'rgba(0, 0, 0, 0)' && clearFocus.focusImage !== 'none', clearFocus);
+    await current.screenshot({ path: out + 'input-clear-focus-1920.png' });
+    await group('focus');
+    await current.screenshot({ path: out + 'focus-date-1920.png' });
+    await current.setViewportSize({ width: 1280, height: 720 });
+    await look({ layout: 'list', showDate: 'on' }); await scene('home');
+    await current.screenshot({ path: out + 'list-inputs-1280.png' });
+    await look({ layout: 'dock', inputShelf: 'glass', showDate: 'on' }); await scene('home');
+    await current.screenshot({ path: out + 'dock-date-1280.png' });
+    await look({ layout: 'list' }); await group('layout');
+    const previewInputs = await current.evaluate(() => [...document.querySelectorAll('.ph-row.k-input')].map(e => e.getAttribute('aria-label')));
+    check('List preview includes the inputs as app rows', previewInputs.join(',') === 'HDMI1,HDMI2,HDMI3,HDMI4', previewInputs);
+    await current.screenshot({ path: out + 'layout-list-preview-1280.png' });
   });
   await run('Independent app identity self-filter', async () => {
     const appId = 'AbCdEf1234.MyHome';
@@ -502,8 +794,8 @@ try {
   await run('Native icon and failed-image fallback', async () => {
     await page({ catalog: CATALOG.map(a => a.id === EXTRA ? { ...a, iconPath: '/home/assets/icons/netflix.svg' } : a) });
     await library();
-    await current.waitForFunction(id => { const row = document.querySelector('[data-action="apps.open.' + id + '"]'); const img = row && row.querySelector('img'); return img && img.complete && img.naturalWidth > 0; }, EXTRA);
-    check('Unbranded installed app uses its native icon', await current.evaluate(id => { const img = document.querySelector('[data-action="apps.open.' + id + '"] img'); return img && getComputedStyle(img).display !== 'none' && img.parentNode.classList.contains('has-native-icon'); }, EXTRA));
+    await current.waitForFunction(id => { const img = document.querySelector('[data-action="apps.open.' + id + '"] [data-native-icon]'); return img && img.complete && img.naturalWidth > 0 && img.parentNode.classList.contains('has-native-icon'); }, EXTRA);
+    check('Unbranded installed app uses its native icon', await current.evaluate(id => { const img = document.querySelector('[data-action="apps.open.' + id + '"] [data-native-icon]'); return img && getComputedStyle(img).display !== 'none' && img.parentNode.classList.contains('has-native-icon'); }, EXTRA));
     current.__expectedFailures.push('/missing-native-icon.png');
     await current.evaluate(id => { __tv.catalog.find(a => a.id === id).iconPath = '/home/assets/icons/missing-native-icon.png'; }, EXTRA);
     await library();
@@ -513,6 +805,32 @@ try {
       return { html: row.innerHTML, src: img && img.src, imageDisplay: img && getComputedStyle(img).display, initialsVisibility: mark && getComputedStyle(mark.firstChild).visibility, complete: img && img.complete, width: img && img.naturalWidth, text: row.textContent };
     }, EXTRA);
     check('Failed native icon leaves readable initials and app name', fallback.imageDisplay === 'none' && fallback.initialsVisibility === 'visible' && fallback.text.includes('Family'), fallback);
+    await closePage();
+    await page({ catalog: CATALOG.map(a => a.id === IDS[1] ? { ...a, iconPath: '/home/assets/icons/netflix.svg' } : a) });
+    await library();
+    await current.waitForFunction(() => { const img = document.querySelector('[data-action="apps.open.netflix"] [data-native-icon]'); return img && img.complete && img.naturalWidth > 0 && img.parentNode.classList.contains('has-native-icon'); });
+    check('Known app prefers its installed icon in All apps', await current.evaluate(() => { const img = document.querySelector('[data-action="apps.open.netflix"] [data-native-icon]'); return img && img.parentNode.classList.contains('has-native-icon') && document.querySelector('[data-action="apps.open.netflix"]').textContent.includes('Netflix'); }));
+    await scene('home');
+    await current.waitForFunction(() => { const img = document.querySelector('[data-action="home.app.netflix"] img'); return img && img.complete && img.naturalWidth > 0; });
+    check('Home tile uses the same installed icon', await current.evaluate(() => { const img = document.querySelector('[data-action="home.app.netflix"] img'); return !!img && img.getAttribute('alt') === '' && document.querySelector('[data-action="home.app.netflix"]').getAttribute('aria-label') === 'Netflix'; }));
+    check('A wide tile keeps one installed picture covering the tile', await current.evaluate(() => {
+      const tile = document.querySelector('[data-action="home.app.netflix"]'), imgs = tile ? [...tile.querySelectorAll('img')] : [];
+      if (!tile || imgs.length !== 1) return false;
+      const tileBox = tile.getBoundingClientRect(), cover = imgs[0].getBoundingClientRect();
+      return getComputedStyle(imgs[0]).objectFit === 'cover' && tileBox.width > tileBox.height * 1.4
+        && Math.abs(cover.width - tileBox.width) < 3 && Math.abs(cover.height - tileBox.height) < 3;
+    }));
+    await editor();
+    check('Editor uses the installed icon without dropping the name', await current.evaluate(() => { const row = document.querySelector('[data-action="editor.move.netflix"]'); const img = row && row.querySelector('img'); return !!img && img.complete && img.naturalWidth > 0 && row.textContent.includes('Netflix'); }));
+    await closePage();
+    await page({ catalog: CATALOG.map(a => a.id === IDS[1] ? { ...a, iconPath: '/home/assets/icons/missing-native-icon.png' } : a), expectedFailures: ['/missing-native-icon.png'] });
+    await library();
+    await current.waitForFunction(() => { const img = document.querySelector('[data-action="apps.open.netflix"] img'); return img && img.complete && img.src.includes('missing-native-icon.png'); });
+    check('Known app icon failure keeps initials and the Netflix name', await current.evaluate(() => { const row = document.querySelector('[data-action="apps.open.netflix"]'), img = row.querySelector('[data-native-icon]'); return getComputedStyle(img).display === 'none' && getComputedStyle(row.querySelector('.native-icon span')).visibility === 'visible' && row.textContent.includes('Netflix'); }));
+    await closePage();
+    await page({ catalog: CATALOG.map(a => a.id === IDS[1] ? { ...a, iconPath: 'https://example.invalid/icon.png' } : a) });
+    await library();
+    check('Remote icon URLs are not requested', await current.evaluate(() => ![...document.querySelectorAll('img')].some(img => img.src.includes('example.invalid'))));
   });
   await run('Catalogue response after closing and reopening', async () => {
     await page();
@@ -595,12 +913,12 @@ try {
   await run('Settings overview and visible choices', async () => {
     await page(); await scene('settings');
     const expected = ['settings.group.background', 'settings.group.layout', 'settings.group.typography', 'settings.group.focus', 'settings.editor', 'settings.group.samsung'];
-    check('Overview has all six settings groups', same((await call('actions')).filter(a => expected.includes(a)).sort(), expected.slice().sort()));
+    check('Overview has the settings groups', same((await call('actions')).filter(a => expected.includes(a)).sort(), expected.slice().sort()));
     const specs = {
       background: { bg: ['dark', 'light', 'photo'] },
-      layout: { layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], controls: ['icons', 'both', 'text'] },
+      layout: { layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], controls: ['icons', 'both', 'text'], shelf: ['glass', 'clear'], inputShelf: ['glass', 'clear'], inputStyle: ['text', 'icons', 'both'] },
       typography: { font: (await state()).fonts.available },
-      focus: { focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'] }
+      focus: { focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'], showDate: ['off', 'on'] }
     };
     for (const [name, axes] of Object.entries(specs)) {
       await group(name);
@@ -878,14 +1196,14 @@ try {
   });
   await run('Wallpaper applies in place and Back keeps the latest applied photo', async () => {
     await page(); await wallpaper(); const before = await wallpaperSaved();
-    check('Applied wallpaper omits the redundant Apply hint', !/apply.*photo/i.test(await current.locator('#appearanceDesc').innerText()));
+    check('Wallpaper has no OK-action footer', (await current.locator('#appearanceDesc').innerText()).trim() === '');
     await nav('down'); await wallpaperSettled(walls[1].id);
     check('A browsed photo is not saved by focus', same(await wallpaperSaved(), before));
-    check('Unsaved preview explains the OK action', /apply.*photo/i.test(await current.locator('#appearanceDesc').innerText()));
+    check('An unsaved wallpaper preview still has no OK footer', (await current.locator('#appearanceDesc').innerText()).trim() === '');
     await nav('ok'); await ready();
     const applied = await wallpaperSaved();
     check('OK applies once while staying inside Wallpaper', (await state()).view === 'wallpaper' && applied.committed.wall === walls[1].id && applied.writes === before.writes + 1 && applied.attempts === before.attempts + 1 && same(await wallpaperApplied(), ['wallpaper.choose.' + walls[1].id]));
-    check('Successful apply clears its redundant Apply hint', !/apply.*photo/i.test(await current.locator('#appearanceDesc').innerText()));
+    check('Applying a wallpaper leaves the OK footer empty', (await current.locator('#appearanceDesc').innerText()).trim() === '');
     check('Applied photo updates the committed Settings backdrop', applied.backdrop.src.includes('/' + walls[1].id + '-panel.jpg'));
     await nav('ok'); await current.keyboard.down('Enter'); await current.keyboard.down('Enter'); await current.keyboard.up('Enter');
     check('Repeated OK on the applied photo is a no-op', same(await wallpaperSaved(), applied));
@@ -904,7 +1222,7 @@ try {
     await page(); await wallpaper(); const before = await wallpaperSaved();
     await nav('up');
     check('Up from the first wallpaper reaches Back without wrapping', (await state()).focusAction === 'wallpaper.back' && (await state()).shown.wall === walls[0].id);
-    check('Back still shows its return hint', /background|return/i.test(await current.locator('#appearanceDesc').innerText()));
+    check('Wallpaper Back has no OK footer', (await current.locator('#appearanceDesc').innerText()).trim() === '' && (await call('where')).focusAction === 'wallpaper.back');
     await nav('down');
     check('Down from Back restores the current candidate', (await state()).focusAction === 'wallpaper.choose.' + walls[0].id);
     await nav(...Array(walls.length - 1).fill('down')); await wallpaperSettled(walls.at(-1).id); await wallpaperRowVisible(walls.at(-1).id);

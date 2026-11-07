@@ -46,6 +46,8 @@
   var PRIVATE_FONTS = window.CleanFramePrivateFontIDs || [], fontMetrics = {}, unavailableFonts = {}, widthCache = {}, fontRevision = 0, fontsReady = false;
   var LOOK_VALUES = { bg: ['dark', 'light', 'photo'], layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], font: Object.keys(FONTS).filter(function (id) { return id === 'manrope' || PRIVATE_FONTS.indexOf(id) >= 0; }), controls: ['icons', 'both', 'text'], focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'], shelf: ['glass', 'clear'], inputStyle: ['text', 'icons', 'both'] };
   var INPUT_ICON_CHOICES = ['auto', 'hdmi', 'switch', 'xbox', 'xbox360', 'kodi'];
+  var INPUT_ICON_LABELS = { auto: 'Auto', hdmi: 'HDMI', switch: 'Switch', xbox: 'Xbox', xbox360: 'Xbox 360', kodi: 'Kodi' };
+  var PLATE_COLOR = { stremio: '#5b45c6', netflix: '#141414', disneyplus: '#0d1b4c', youtube: '#e11d2e', appletv: '#1c1c1e', primevideo: '#1398ec', abciview: '#0b4ea2', sbs: '#c2410c', applemusic: '#e11d48', spotify: '#128a3e', hbomax: '#5b2db3', tubi: '#2e1a47' };
   var INPUT_HOLD_MS = 520;
   var LOOK_NAMES = { bg: 'Background', layout: 'Layout', apps: 'Apps', font: 'Font', controls: 'Home controls', focus: 'Focus', material: 'Material', shelf: 'Dock background' };
   var VALUE_NAMES = { dark: 'Dark', light: 'Light', photo: 'Photo', list: 'List', dock: 'Dock', type: 'Type', glass: 'Glass', soft: 'Soft', frost: 'Frost', tint: 'Clear tint', icons: 'Icons', both: 'Icons and text', text: 'Text', clear: 'Clear' };
@@ -158,6 +160,10 @@
     return 'hdmi';
   }
   function inputIconChoice(port) { return (S.c.inputIcons || {})[String(port)] || 'auto'; }
+  function inputIconLabel(value) { return INPUT_ICON_LABELS[value] || 'Auto'; }
+  function plateId(a) { return a && PLATE_COLOR[a.brand] ? a.brand : a && PLATE_COLOR[a.id] ? a.id : ''; }
+  function plateSrc(a) { var id = plateId(a); return id ? ICONS + 'plates/' + id + '.svg' : ''; }
+  function artworkSrc(a) { return a && (a.icon || plateSrc(a)) || ''; }
   function resolvedInputIcon(port) {
     var choice = inputIconChoice(port);
     return choice === 'auto' ? matchInputIcon(inputLabel(port)) : choice;
@@ -213,11 +219,15 @@
     return '<span class="mark' + (markProbes[id] === 'bad' ? ' is-bad' : '') + '" data-mark="' + id + '" style="width:' + w + 'px;height:' + h + 'px">'
       + (maskSupport ? '<span class="mk" style="' + st + ';-webkit-mask-image:url(' + ICONS + id + '.svg);mask-image:url(' + ICONS + id + '.svg)"></span>' : '<img alt="" src="' + ICONS + id + '.svg" style="' + st + '">') + '</span>';
   }
-  function appMark(a, w, h, size) {
-    var words = a.name.split(/\s+/), letters = words[0].charAt(0) + (words.length > 1 ? words[1].charAt(0) : '');
-    var monogram = '<span class="mark monogram' + (a.icon ? ' native-icon' : '') + '" style="width:' + w + 'px;height:' + h + 'px;font-size:' + Math.round(size * .65) + 'px"><span>' + esc(letters.toUpperCase()) + '</span>'
-      + (a.icon ? '<img alt="" data-native-icon="true" src="' + esc(a.icon) + '">' : '') + '</span>';
-    if (a.icon) return monogram;
+  function appMark(a, w, h, size, fill) {
+    var src = artworkSrc(a), words = a.name.split(/\s+/), letters = words[0].charAt(0) + (words.length > 1 ? words[1].charAt(0) : ''), color = a.icon ? '' : PLATE_COLOR[plateId(a)] || '';
+    if (fill && src) {
+      return (a.icon ? '<img class="art-fill" alt="" src="' + esc(src) + '">' : '')
+        + '<span class="mark native-icon art-logo-slot"><span>' + esc(letters.toUpperCase()) + '</span><img class="art-logo" alt="" data-native-icon="true" src="' + esc(src) + '"></span>';
+    }
+    var monogram = '<span class="mark monogram' + (src ? ' native-icon' : '') + '" style="width:' + w + 'px;height:' + h + 'px;font-size:' + Math.round(size * .65) + 'px' + (color ? ';background:' + color : '') + '"><span>' + esc(letters.toUpperCase()) + '</span>'
+      + (src ? '<img class="art-logo" alt="" data-native-icon="true" src="' + esc(src) + '">' : '') + '</span>';
+    if (src) return monogram;
     if (a.mark && (maskSupport || S.c.bg !== 'light')) return markHtml(a.brand || a.id, w, h, size);
     return monogram;
   }
@@ -381,13 +391,22 @@
     el._sig = sig;
     Array.prototype.forEach.call(el.querySelectorAll('[data-native-icon]'), function (img) {
       function ready() { img.parentNode.classList.add('has-native-icon'); extendIconBackground(img); }
-      function failed() { img.style.display = 'none'; img.parentNode.classList.remove('has-native-icon'); }
+      function failed() {
+        var tile = img;
+        img.style.display = 'none';
+        if (img.parentNode.classList) img.parentNode.classList.remove('has-native-icon');
+        while (tile && tile !== document.body && !/(?:^|\s)(?:tile|gt|ph-row|sc|er)(?:\s|$)/.test(tile.className || '')) tile = tile.parentNode;
+        if (!tile || tile === document.body) return;
+        Array.prototype.forEach.call(tile.querySelectorAll('.art-fill'), function (fill) { fill.style.display = 'none'; });
+        tile.className = tile.className.replace(/ has-art| has-plate/g, '');
+        tile.style.removeProperty('--art-plate');
+      }
       img.onload = ready; img.onerror = failed;
       if (img.complete) { if (img.naturalWidth) ready(); else failed(); }
     });
   }
-  /* One sample when an installed icon loads. A flattened square picture keeps its
-     own pixels; only an opaque edge color may fill the rest of the rounded tile. */
+  /* A readable edge color can paint the tile. Cross-origin pictures skip the sample;
+     their cover image still fills the rectangle and the contained copy stays uniform. */
   function extendIconBackground(img) {
     var canvas, ctx, size = 12, data, x, y, p, r = 0, g = 0, b = 0, n = 0, transparent = 0, tile = img.parentNode;
     while (tile && tile !== document.body && !/(?:^|\s)(?:tile|gt|ph-row|sc|er)(?:\s|$)/.test(tile.className || '')) tile = tile.parentNode;
@@ -1166,14 +1185,11 @@
       { id: 'apps', title: 'App display', horizontal: true, items: options('apps', ['text', 'icons', 'both']) },
       { id: 'controls', title: 'Home controls', horizontal: true, items: options('controls', ['text', 'icons', 'both']) },
       { id: 'shelf', title: 'Dock background', horizontal: true, items: options('shelf', ['glass', 'clear']) },
-      { id: 'inputStyle', title: 'Input display', horizontal: true, items: options('inputStyle', ['text', 'icons', 'both']) }
-    ].concat((S.c.inputs || INPUT_PORTS).map(function (port) {
-      return { id: 'inputicon-' + port, title: '', caption: inputLabel(port), compact: true, horizontal: true, items: INPUT_ICON_CHOICES.map(function (value) {
-        var label = value === 'xbox360' ? '360' : value === 'auto' ? 'Auto' : value === 'hdmi' ? 'HDMI' : value === 'switch' ? 'Switch' : value === 'xbox' ? 'Xbox' : 'Kodi';
-        var full = value === 'xbox360' ? 'Xbox 360' : value === 'switch' ? 'Nintendo Switch' : label;
-        return { action: 'inputicon.' + port + '.' + value, label: label, applied: inputIconChoice(port) === value, aria: inputLabel(port) + ' ' + full };
-      }) };
-    }));
+      { id: 'inputStyle', title: 'Input display', horizontal: true, items: options('inputStyle', ['text', 'icons', 'both']) },
+      { id: 'inputIcons', title: 'Input icons', items: (S.c.inputs || INPUT_PORTS).map(function (port) {
+        return { action: 'inputmenu.' + port, label: inputLabel(port), menu: port, valueLabel: inputIconLabel(inputIconChoice(port)) };
+      }) }
+    ];
     if (t.group === 'typography') return [{ id: 'font', title: '', items: options('font', LOOK_VALUES.font) }];
     if (t.group === 'focus') return [
       { id: 'focus', title: 'Focus style', horizontal: true, items: options('focus', ['type', 'glass']) },
@@ -1196,6 +1212,9 @@
       else enabled.forEach(function (item) { rows.push([item]); });
     });
     if (S.lookError) rows.push([{ action: 'settings.retry', label: 'Try again' }]);
+    if (t.iconMenu) INPUT_ICON_CHOICES.forEach(function (value) {
+      rows.push([{ action: 'inputicon.' + t.iconMenu.port + '.' + value, menuOption: true, port: t.iconMenu.port, value: value, label: inputIconLabel(value) }]);
+    });
     return rows;
   }
   function detailLocation(t) {
@@ -1236,7 +1255,17 @@
       if (error && error.patch[error.row] !== undefined) detailFocus(t, choice(error.row, error.patch[error.row]), 0);
       if (error && error.row === 'mode') applyRotation(error.patch.mode);
       else if (error) setLook(error.patch, { row: error.row });
-    }     else if (item.action.indexOf('inputicon.') === 0) { var iconBits = item.action.split('.'); setInputIcon(Number(iconBits[1]), iconBits[2]); }
+    } else if (item.action.indexOf('inputmenu.') === 0) {
+      var menuPort = Number(item.action.slice(10));
+      t.iconMenu = { port: menuPort, value: inputIconChoice(menuPort) };
+      t.f.action = 'inputicon.' + menuPort + '.' + t.iconMenu.value;
+    } else if (item.action.indexOf('inputicon.') === 0) {
+      var iconBits = item.action.split('.');
+      setInputIcon(Number(iconBits[1]), iconBits[2]);
+      t.f.action = 'inputmenu.' + iconBits[1];
+      S.detailFocus[t.group] = t.f.action;
+      t.iconMenu = null;
+    }
     else if (item.axis === 'mode') applyRotation(item.value);
     else if (item.axis) { patch[item.axis] = item.value; setLook(patch, { row: item.axis }); }
     else if (item.action === 'background.wallpaper') openWallpaper();
@@ -1264,7 +1293,21 @@
       if (t.f.column === undefined) t.f.column = detailLocation(t).column;
     },
     key: function (t, k) {
-      var at = detailLocation(t), row = at.row, column = at.column;
+      var at, row, column, opts, i, port;
+      if (t.iconMenu) {
+        opts = INPUT_ICON_CHOICES;
+        i = opts.indexOf(t.iconMenu.value);
+        if (i < 0) i = 0;
+        port = t.iconMenu.port;
+        if (k === 'back') { t.iconMenu = null; t.f.action = 'inputmenu.' + port; S.detailFocus[t.group] = t.f.action; return; }
+        if (k === 'ok') { setInputIcon(port, opts[i]); t.iconMenu = null; t.f.action = 'inputmenu.' + port; S.detailFocus[t.group] = t.f.action; return; }
+        if (k === 'up' && i > 0) i--;
+        if (k === 'down' && i < opts.length - 1) i++;
+        t.iconMenu.value = opts[i];
+        t.f.action = 'inputicon.' + port + '.' + opts[i];
+        return;
+      }
+      at = detailLocation(t); row = at.row; column = at.column;
       if (k === 'back') { detailBack(); return; }
       if (k === 'ok') { detailOk(t, at.item); return; }
       if (k === 'up' || k === 'down') {
@@ -1383,16 +1426,17 @@
 
   function inputTileInner(port) {
     var style = S.c.inputStyle || 'both', icon = resolvedInputIcon(port), branded = icon !== 'hdmi';
-    var showIcon = style !== 'text', showLabel = style !== 'icons' || !branded, html = '';
+    var showIcon = style !== 'text', showLabel = style !== 'icons' || !branded, html = '<span class="input-face">';
     if (showIcon) html += '<img class="input-glyph" alt="" src="' + ICONS + 'inputs/' + icon + '.svg">';
     if (showLabel) html += '<span class="input-name">' + esc(inputLabel(port)) + '</span>';
-    return html;
+    return html + '</span>';
   }
   function renderInputRow(t) {
     var ports = visibleInputs(), focus = t.id === 'home' && t.f.zone === 'inports', list = S.c.layout === 'list';
-    var tileW = list ? 176 : 220, tileH = list ? 64 : 88, gap = 16, pitch = tileW + gap, html = '';
+    var g = dockGeom(Math.max(1, S.c.home.length || 1));
+    var tileW = list ? 280 : g.tw, tileH = list ? 112 : g.th, gap = g.pitch - g.tw, pitch = tileW + gap, html = '';
     var total = ports.length ? (ports.length - 1) * pitch + tileW : 0;
-    var origin = list ? 140 : Math.round((1920 - total) / 2), top = list ? 76 : dockGeom(Math.max(1, S.c.home.length || 1)).y - tileH - 20;
+    var origin = list ? 140 : Math.round((1920 - total) / 2), top = list ? 72 : g.y - tileH - 16;
     if (t.id === 'home' && t.f.zone === 'inports' && !ports.length) t.f.zone = 'apps';
     inputRow.className = 'input-row' + (list ? ' is-list' : '') + (ports.length ? '' : ' is-empty');
     inputRow.style.top = top + 'px';
@@ -1537,8 +1581,8 @@
     var a, body;
     if (it.kind === 'add') return '<span class="add">' + icon('plus') + '</span><span class="label">' + (full ? 'Home is full' : 'Add app') + '</span>';
     a = app(it.id);
-    body = S.c.apps === 'text' ? '' : appMark(a, 120, 72, S.c.apps === 'icons' ? 56 : 58);
-    return body + (S.c.apps === 'icons' ? '' : '<span class="label" style="font-size:' + dockLabelSize(a.id) + 'px;top:' + ((S.c.apps === 'text' ? 32 : 104) + fontShift('primary', dockLabelSize(a.id))) + 'px"><span class="label-ink">' + esc(a.name) + '</span></span>') + '<span class="nudge nudge-l">' + icon('left') + '</span><span class="nudge nudge-r">' + icon('right') + '</span>';
+    body = S.c.apps === 'text' ? '' : appMark(a, 120, 72, S.c.apps === 'icons' ? 56 : 58, true);
+    return body + (S.c.apps === 'icons' ? '' : '<span class="label" style="font-size:' + dockLabelSize(a.id) + 'px;' + (S.c.apps === 'text' || artworkSrc(a) ? '' : 'top:' + (104 + fontShift('primary', dockLabelSize(a.id))) + 'px;') + (S.c.apps === 'text' ? 'top:' + (32 + fontShift('primary', dockLabelSize(a.id))) + 'px;' : '') + '"><span class="label-ink">' + esc(a.name) + '</span></span>') + '<span class="nudge nudge-l">' + icon('left') + '</span><span class="nudge nudge-r">' + icon('right') + '</span>';
   }
   /* A wide label can reach the shelf before its icon. Check the rendered icon box,
      including during the track's 180ms transition, so both disappear together. */
@@ -1583,8 +1627,11 @@
       var lifted = hs.lifted && i === anchor, partial = g.broad && (left - off < -1 || left + g.tw - off > g.shelf + 1);
       setContent(el, it.kind + '|' + (it.id || '') + '|' + (it.id ? dockLabelSize(it.id) : full) + '|' + S.c.bg + '|' + S.c.apps + '|' + homeFont(), function () { return '<span class="tile-content">' + dockTileHtml(it, full) + '</span>'; });
       el.className = 'tile k-' + it.kind + (focus ? ' is-focus' : '') + (sel ? ' is-sel' : '') + (lifted ? ' is-lifted' : '') + (partial ? ' is-partial' : '')
-        + (a && !a.mark ? ' is-text' : '') + (it.kind === 'add' && full ? ' is-full' : '') + (it.kind === 'app' && S.press === it.id ? ' is-press' : '')
+        + (a && !a.mark && !artworkSrc(a) ? ' is-text' : '') + (a && S.c.apps !== 'text' && artworkSrc(a) ? ' has-art' : '') + (a && S.c.apps !== 'text' && !a.icon && plateId(a) ? ' has-plate' : '')
+        + (it.kind === 'add' && full ? ' is-full' : '') + (it.kind === 'app' && S.press === it.id ? ' is-press' : '')
         + (lifted && i === 0 ? ' no-l' : '') + (lifted && i >= ns - 1 ? ' no-r' : '');
+      if (a && S.c.apps !== 'text' && !a.icon && PLATE_COLOR[plateId(a)]) el.style.setProperty('--art-plate', PLATE_COLOR[plateId(a)]);
+      else el.style.removeProperty('--art-plate');
       el.style.transform = 'translate3d(' + left + 'px,0,0)';
       el.setAttribute('role', 'button');
       if (a) el.setAttribute('aria-label', a.name);
@@ -1762,7 +1809,15 @@
         + '<div class="setting-options"' + ((section.items[0].axis || section.compact) ? ' role="radiogroup" aria-label="' + esc(section.caption || section.title || LOOK_NAMES[section.id] || DETAIL_NAMES[t.group]) + '"' : '') + '>'
         + (section.caption ? '<span class="input-icon-name">' + esc(section.caption) + '</span>' : '')
         + section.items.map(function (item) {
-          var swatch = item.axis === 'bg', body = '';
+          var swatch = item.axis === 'bg', body = '', open, menu;
+          if (item.menu) {
+            open = t.iconMenu && t.iconMenu.port === item.menu;
+            menu = open ? '<div class="icon-menu is-up" role="listbox" aria-label="' + esc(item.label) + ' icon">' + INPUT_ICON_CHOICES.map(function (value) {
+              var pending = t.iconMenu.value === value, applied = inputIconChoice(item.menu) === value;
+              return '<button type="button" tabindex="-1" class="setting-choice icon-option' + (pending ? ' is-focus' : '') + (applied ? ' is-applied' : '') + '" role="option" aria-selected="' + pending + '" aria-label="' + esc(item.label + ' ' + inputIconLabel(value)) + '" data-z="detail" data-i="0" data-id="inputicon.' + item.menu + '.' + value + '" data-action="inputicon.' + item.menu + '.' + value + '"><span class="setting-name">' + esc(inputIconLabel(value)) + '</span>' + (applied ? '<span class="setting-tick" aria-hidden="true">' + icon('check') + '</span>' : '<span class="setting-tick" aria-hidden="true"></span>') + '</button>';
+            }).join('') + '</div>' : '';
+            return '<div class="icon-select' + (open ? ' is-open' : '') + '">' + command({ action: item.action, label: item.label, aria: item.label + ', ' + item.valueLabel }, '<span class="setting-copy"><span class="setting-name">' + esc(item.label) + '</span></span><span class="icon-select-value">' + esc(item.valueLabel) + icon('down') + '</span>', 'icon-select-row') + menu + '</div>';
+          }
           if (swatch || item.thumbnail) body += item.value === 'light' || item.value === 'dark'
             ? '<span class="setting-swatch swatch-' + item.value + '" aria-hidden="true"></span>'
             : '<img class="setting-swatch" src="' + WP + S.c.wall + '-thumb.jpg" alt="">';
@@ -1880,7 +1935,7 @@
   };
   function gridTileHtml(id) {
     var a = app(id), state = onHome(id) ? badge(true) + '<span>On Home</span>' : '';
-    return '<span class="panel-content">' + appMark(a, 120, 72, 58) + '<span class="label">' + esc(a.name) + '</span></span><span class="state">' + state + '</span>';
+    return '<span class="panel-content">' + appMark(a, 120, 72, 58, true) + '<span class="label">' + esc(a.name) + '</span></span><span class="state">' + state + '</span>';
   }
   var FILLS = {
     apps: function (t, el) {
@@ -1894,7 +1949,9 @@
       keyed(el.grid, items.map(function (id) { return { key: id, id: id }; }), function (tile, it, i) {
         var focus = f.zone === 'grid' && i === f.i;
         setContent(tile, [it.id, app(it.id).name, onHome(it.id)].join('|'), function () { return gridTileHtml(it.id); });
-        tile.className = 'gt' + (focus ? ' is-focus' : '');
+        tile.className = 'gt' + (artworkSrc(app(it.id)) ? ' has-art' : '') + (!app(it.id).icon && plateId(app(it.id)) ? ' has-plate' : '') + (focus ? ' is-focus' : '');
+        if (!app(it.id).icon && PLATE_COLOR[plateId(app(it.id))]) tile.style.setProperty('--art-plate', PLATE_COLOR[plateId(app(it.id))]);
+        else tile.style.removeProperty('--art-plate');
         tile.style.transform = 'translate3d(' + ((i % COLS) * GRID_COL) + 'px,' + (Math.floor(i / COLS) * GRID_ROW) + 'px,0)';
         tile.setAttribute('role', 'button'); tile.setAttribute('aria-label', app(it.id).name);
         attrs(tile, 'grid', i, 'apps.open.' + it.id);

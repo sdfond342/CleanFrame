@@ -531,12 +531,18 @@ try {
       await current.setViewportSize({ width, height: width * 9 / 16 });
       await scene('home'); await look({ apps: 'both', layout: 'dock', shelf: 'glass' });
       const shape = await current.evaluate(() => {
-        const tile = document.querySelector('#dock .tile'), row = document.getElementById('inputRow'), dock = document.getElementById('dock');
-        const tr = tile.getBoundingClientRect(), rr = row.getBoundingClientRect(), dr = dock.getBoundingClientRect();
-        const img = tile.querySelector('img');
-        return { ratio: tr.width / tr.height, radius: parseFloat(getComputedStyle(tile).borderRadius), label: tile.getAttribute('aria-label'), fit: img ? getComputedStyle(img).objectFit : 'contain', gap: dr.top - rr.bottom };
+        const tile = document.querySelector('#dock .tile'), input = document.querySelector('#inputRow .input-tile'), row = document.getElementById('inputRow'), dock = document.getElementById('dock');
+        const tr = tile.getBoundingClientRect(), ir = input.getBoundingClientRect(), rr = row.getBoundingClientRect(), dr = dock.getBoundingClientRect();
+        const logo = tile.querySelector('.art-logo'), fill = tile.querySelector('.art-fill');
+        const scale = document.getElementById('stage').getBoundingClientRect().width / 1920;
+        return {
+          ratio: tr.width / tr.height, radius: parseFloat(getComputedStyle(tile).borderRadius), label: tile.getAttribute('aria-label'),
+          fit: logo ? getComputedStyle(logo).objectFit : '', fill: fill ? getComputedStyle(fill).objectFit : 'plate',
+          gap: (dr.top - rr.bottom) / scale,
+          sameBox: Math.abs(tr.width - ir.width) < 1.5 && Math.abs(tr.height - ir.height) < 1.5 && getComputedStyle(tile).borderRadius === getComputedStyle(input).borderRadius
+        };
       });
-      check('Home tiles stay rounded rectangles above the input row at ' + width, shape.ratio > 1.6 && shape.radius >= 20 && !!shape.label && shape.fit === 'contain' && shape.gap >= 8, shape);
+      check('Home tiles stay rounded rectangles above the input row at ' + width, shape.ratio > 1.6 && shape.radius >= 20 && !!shape.label && shape.fit === 'contain' && shape.fill !== 'fill' && shape.gap >= 8 && shape.sameBox, shape);
       await look({ layout: 'list' });
       const listGap = await current.evaluate(() => {
         const scale = document.getElementById('stage').getBoundingClientRect().width / 1920;
@@ -575,10 +581,18 @@ try {
     check('Settings overview has no OK footer', await current.evaluate(() => !document.querySelector('.settings-overview-hint') && !/Open selected group/.test(document.getElementById('stage').innerText)));
     await group('layout');
     check('Layout has no OK footer', (await current.locator('#appearanceDesc').innerText()).trim() === '');
-    await act('inputicon.3.switch');
+    const iconWrites = (await state()).writes;
+    await act('inputmenu.3');
+    check('Icon menu opens on the saved choice', (await call('where')).focusAction === 'inputicon.3.auto' && await current.locator('.icon-menu .icon-option').count() === 6);
+    await nav('down');
+    check('Moving the icon highlight does not save', (await call('where')).focusAction === 'inputicon.3.hdmi' && (await state()).writes === iconWrites && !(await stored()).inputIcons['3']);
+    await nav('back');
+    check('Back closes the icon menu without saving', (await call('where')).focusAction === 'inputmenu.3' && !(await current.locator('.icon-menu').count()) && (await state()).writes === iconWrites);
+    await act('inputmenu.3');
+    await nav('down', 'down', 'ok');
     await scene('home');
     check('A manual icon overrides the name', (await glyph(3)).endsWith('/inputs/switch.svg') && (await stored()).inputIcons['3'] === 'switch' && (await stored()).inputNames['3'] == null);
-    await group('layout'); await act('inputicon.3.auto'); await scene('home');
+    await group('layout'); await act('inputmenu.3'); await nav('up', 'up', 'ok'); await scene('home');
     check('Auto follows the Kodi name again', (await glyph(3)).endsWith('/inputs/kodi.svg') && !(await stored()).inputIcons['3']);
     await nav('up', 'right');
     const calls = await current.evaluate(() => __tv.calls.length);
@@ -614,6 +628,110 @@ try {
     await editor(); await act('editor.input.move.2'); await nav('back', 'right', 'ok'); await nav('back'); await scene('home');
     check('Showing an input restores its tile and saved name', (await current.locator('#inputRow .input-tile').allTextContents()).join(',') === 'Xbox 360' && (await stored()).inputs.includes(2) && (await stored()).inputNames['2'] === 'Xbox 360');
   });
+  await run('Input tile centering, artwork fill and icon menu', async () => {
+    await page();
+    const align = async (style, focusPort) => {
+      await look({ layout: 'dock', apps: 'both', inputStyle: style, shelf: 'glass' });
+      await scene('home');
+      if (focusPort) { await nav('up'); for (let i = 1; i < focusPort; i++) await nav('right'); }
+      return current.evaluate(() => {
+        const scale = document.getElementById('stage').getBoundingClientRect().width / 1920;
+        const app = document.querySelector('#dock .tile');
+        return [...document.querySelectorAll('#inputRow .input-tile')].map(tile => {
+          const name = tile.querySelector('.input-name');
+          const icon = tile.querySelector('.input-glyph');
+          const face = tile.querySelector('.input-face');
+          const tr = tile.getBoundingClientRect();
+          const ar = app.getBoundingClientRect();
+          let textDelta = null;
+          if (name) {
+            const range = document.createRange();
+            range.selectNodeContents(name);
+            const rr = range.getBoundingClientRect();
+            textDelta = name.scrollWidth > name.clientWidth + 1 ? null : ((rr.left + rr.right) / 2 - (tr.left + tr.right) / 2) / scale;
+          }
+          const ir = icon ? icon.getBoundingClientRect() : null;
+          const nr = name ? name.getBoundingClientRect() : null;
+          let glyphsInside = true;
+          if (name && textDelta !== null) {
+            const range = document.createRange();
+            range.selectNodeContents(name);
+            const rr = range.getBoundingClientRect();
+            glyphsInside = rr.width > 0 && rr.left >= tr.left + 8 * scale && rr.right <= tr.right - 8 * scale;
+          }
+          return {
+            label: tile.getAttribute('aria-label'),
+            focused: tile.classList.contains('is-focus'),
+            textDelta, faceDelta: ((face.getBoundingClientRect().left + face.getBoundingClientRect().right) / 2 - (tr.left + tr.right) / 2) / scale,
+            iconRatio: ir ? ir.width / ir.height : null,
+            inside: (!nr || nr.left >= tr.left - 1 && nr.right <= tr.right + 1) && glyphsInside && (!ir || ir.left >= tr.left - 1 && ir.right <= tr.right + 1 && ir.top >= tr.top - 1 && ir.bottom <= tr.bottom + 1),
+            same: Math.abs(tr.width - ar.width) < 1.5 && Math.abs(tr.height - ar.height) < 1.5 && getComputedStyle(tile).borderRadius === getComputedStyle(app).borderRadius
+          };
+        });
+      });
+    };
+    for (const style of ['text', 'icons', 'both']) for (const focus of [false, true]) {
+      const rows = await align(style, focus ? 1 : 0);
+      const hdmi = rows.filter(row => /^HDMI\d$/.test(row.label));
+      const focusOk = focus ? rows[0].focused && rows.slice(1).every(row => !row.focused) : rows.every(row => !row.focused);
+      check(style + (focus ? ' focused' : ' resting') + ' centres HDMI labels', hdmi.length >= 3 && focusOk && hdmi.every(row => row.same && row.inside && Math.abs(row.faceDelta) < 2 && (row.textDelta === null || Math.abs(row.textDelta) < 3) && (row.iconRatio === null || Math.abs(row.iconRatio - 1) < 0.08)), rows);
+    }
+    await current.evaluate(() => {
+      const saved = JSON.parse(localStorage.getItem('cleanframe.home.v1'));
+      saved.inputNames = { 1: 'TV', 2: 'Living Room Projector', 3: 'HDMI3' };
+      localStorage.setItem('cleanframe.home.v1', JSON.stringify(saved));
+    });
+    await current.reload(); await ready();
+    await look({ layout: 'dock', apps: 'both', inputStyle: 'both' });
+    const named = await align('both', 0);
+    check('Short, HDMI and long names stay centred and inside the tile', named.map(row => row.label).join(',') === 'TV,Living Room Projector,HDMI3,HDMI4' && named.every(row => row.inside && Math.abs(row.faceDelta) < 2 && (row.textDelta === null || Math.abs(row.textDelta) < 4)), named);
+    await current.screenshot({ path: out + 'home-input-names-1920.png' });
+    await current.evaluate(() => {
+      const saved = JSON.parse(localStorage.getItem('cleanframe.home.v1'));
+      saved.inputNames = { 3: 'HDMI3' };
+      localStorage.setItem('cleanframe.home.v1', JSON.stringify(saved));
+    });
+    await current.reload(); await ready();
+    const filled = await current.evaluate(() => ['youtube', 'netflix', 'appletv'].map(id => {
+      const tile = document.querySelector('[data-action="home.app.' + id + '"]');
+      const logo = tile.querySelector('.art-logo').getBoundingClientRect();
+      const box = tile.getBoundingClientRect();
+      const bg = getComputedStyle(tile).backgroundColor;
+      return { id, src: tile.querySelector('.art-logo').getAttribute('src'), ratio: logo.width / logo.height, centered: Math.abs((logo.left + logo.right) / 2 - (box.left + box.right) / 2), gap: box.width - logo.width, opaque: bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent' };
+    }));
+    check('YouTube, Netflix and Apple TV plates fill the rectangle around an unstretched mark', filled.every(item => item.src.includes('/plates/' + item.id + '.svg') && Math.abs(item.ratio - 1) < 0.08 && item.centered < 2 && item.gap > 40 && item.opaque), filled);
+    for (const width of [1920, 1280]) {
+      await current.setViewportSize({ width, height: width * 9 / 16 });
+      await scene('home'); await look({ apps: 'both', inputStyle: 'both', layout: 'dock' });
+      await current.screenshot({ path: out + 'home-input-both-' + width + '.png' });
+      await look({ inputStyle: 'text' });
+      await current.screenshot({ path: out + 'home-input-text-' + width + '.png' });
+      await look({ inputStyle: 'icons' });
+      await nav('up');
+      await current.screenshot({ path: out + 'home-input-icons-' + width + '.png' });
+      await look({ inputStyle: 'both', apps: 'icons' });
+      await current.screenshot({ path: out + 'home-art-icons-' + width + '.png' });
+      await look({ apps: 'both' });
+      await group('layout');
+      const menuFit = await current.evaluate(() => {
+        const stage = document.getElementById('stage').getBoundingClientRect();
+        const rows = [...document.querySelectorAll('.section-inputIcons .icon-select-row')].map(e => e.getBoundingClientRect());
+        return { count: rows.length, inside: rows.every(r => r.top >= stage.top + 4 && r.bottom <= stage.bottom - 4) };
+      });
+      check('Input icon rows fit the layout screen at ' + width, menuFit.count === 4 && menuFit.inside, menuFit);
+      await current.screenshot({ path: out + 'icon-menu-closed-' + width + '.png' });
+      await act('inputmenu.1');
+      const openFit = await current.evaluate(() => {
+        const stage = document.getElementById('stage').getBoundingClientRect();
+        const menu = document.querySelector('.icon-menu').getBoundingClientRect();
+        const options = [...document.querySelectorAll('.icon-menu .icon-option')].map(e => e.textContent.trim());
+        return { inside: menu.top >= stage.top + 4 && menu.bottom <= stage.bottom - 4 && menu.left >= stage.left && menu.right <= stage.right, options };
+      });
+      check('Open icon menu stays on screen at ' + width, openFit.inside && openFit.options.join(',') === 'Auto,HDMI,Switch,Xbox,Xbox 360,Kodi', openFit);
+      await current.screenshot({ path: out + 'icon-menu-open-' + width + '.png' });
+      await nav('back', 'back');
+    }
+  });
   await run('Independent app identity self-filter', async () => {
     const appId = 'AbCdEf1234.MyHome';
     await page({ currentAppId: appId, catalog: CATALOG.filter(a => a.id !== 'nClrkHome1.FrameHome').concat({ id: appId, name: 'Family Home', show: true }) });
@@ -638,8 +756,8 @@ try {
   await run('Native icon and failed-image fallback', async () => {
     await page({ catalog: CATALOG.map(a => a.id === EXTRA ? { ...a, iconPath: '/home/assets/icons/netflix.svg' } : a) });
     await library();
-    await current.waitForFunction(id => { const row = document.querySelector('[data-action="apps.open.' + id + '"]'); const img = row && row.querySelector('img'); return img && img.complete && img.naturalWidth > 0; }, EXTRA);
-    check('Unbranded installed app uses its native icon', await current.evaluate(id => { const img = document.querySelector('[data-action="apps.open.' + id + '"] img'); return img && getComputedStyle(img).display !== 'none' && img.parentNode.classList.contains('has-native-icon'); }, EXTRA));
+    await current.waitForFunction(id => { const img = document.querySelector('[data-action="apps.open.' + id + '"] [data-native-icon]'); return img && img.complete && img.naturalWidth > 0 && img.parentNode.classList.contains('has-native-icon'); }, EXTRA);
+    check('Unbranded installed app uses its native icon', await current.evaluate(id => { const img = document.querySelector('[data-action="apps.open.' + id + '"] [data-native-icon]'); return img && getComputedStyle(img).display !== 'none' && img.parentNode.classList.contains('has-native-icon'); }, EXTRA));
     current.__expectedFailures.push('/missing-native-icon.png');
     await current.evaluate(id => { __tv.catalog.find(a => a.id === id).iconPath = '/home/assets/icons/missing-native-icon.png'; }, EXTRA);
     await library();
@@ -652,17 +770,20 @@ try {
     await closePage();
     await page({ catalog: CATALOG.map(a => a.id === IDS[1] ? { ...a, iconPath: '/home/assets/icons/netflix.svg' } : a) });
     await library();
-    await current.waitForFunction(() => { const img = document.querySelector('[data-action="apps.open.netflix"] img'); return img && img.complete && img.naturalWidth > 0; });
-    check('Known app prefers its installed icon in All apps', await current.evaluate(() => { const img = document.querySelector('[data-action="apps.open.netflix"] img'); return img && img.parentNode.classList.contains('has-native-icon') && document.querySelector('[data-action="apps.open.netflix"]').textContent.includes('Netflix'); }));
+    await current.waitForFunction(() => { const img = document.querySelector('[data-action="apps.open.netflix"] [data-native-icon]'); return img && img.complete && img.naturalWidth > 0 && img.parentNode.classList.contains('has-native-icon'); });
+    check('Known app prefers its installed icon in All apps', await current.evaluate(() => { const img = document.querySelector('[data-action="apps.open.netflix"] [data-native-icon]'); return img && img.parentNode.classList.contains('has-native-icon') && document.querySelector('[data-action="apps.open.netflix"]').textContent.includes('Netflix'); }));
     await scene('home');
     await current.waitForFunction(() => { const img = document.querySelector('[data-action="home.app.netflix"] img'); return img && img.complete && img.naturalWidth > 0; });
     check('Home tile uses the same installed icon', await current.evaluate(() => { const img = document.querySelector('[data-action="home.app.netflix"] img'); return !!img && img.getAttribute('alt') === '' && document.querySelector('[data-action="home.app.netflix"]').getAttribute('aria-label') === 'Netflix'; }));
     check('A wide tile keeps the installed icon contained', await current.evaluate(() => {
-      const tile = document.querySelector('[data-action="home.app.netflix"]'), img = tile && tile.querySelector('img');
-      if (!tile || !img) return false;
-      const tileBox = tile.getBoundingClientRect(), image = img.getBoundingClientRect();
+      const tile = document.querySelector('[data-action="home.app.netflix"]'), img = tile && tile.querySelector('.art-logo'), fill = tile && tile.querySelector('.art-fill');
+      if (!tile || !img || !fill) return false;
+      const tileBox = tile.getBoundingClientRect(), image = img.getBoundingClientRect(), cover = fill.getBoundingClientRect();
       const bg = getComputedStyle(tile).backgroundColor;
-      return getComputedStyle(img).objectFit === 'contain' && tileBox.width > tileBox.height * 1.4 && image.width <= tileBox.width && image.height <= tileBox.height && bg !== 'rgba(0, 0, 0, 0)';
+      const ratio = image.width / image.height;
+      return getComputedStyle(img).objectFit === 'contain' && getComputedStyle(fill).objectFit === 'cover'
+        && tileBox.width > tileBox.height * 1.4 && image.width <= tileBox.width + 1 && image.height <= tileBox.height + 1
+        && Math.abs(ratio - 1) < 0.08 && cover.width >= tileBox.width - 1 && cover.height >= tileBox.height - 1 && bg !== 'rgba(0, 0, 0, 0)';
     }));
     await editor();
     check('Editor uses the installed icon without dropping the name', await current.evaluate(() => { const row = document.querySelector('[data-action="editor.move.netflix"]'); const img = row && row.querySelector('img'); return !!img && img.complete && img.naturalWidth > 0 && row.textContent.includes('Netflix'); }));
@@ -670,7 +791,7 @@ try {
     await page({ catalog: CATALOG.map(a => a.id === IDS[1] ? { ...a, iconPath: '/home/assets/icons/missing-native-icon.png' } : a), expectedFailures: ['/missing-native-icon.png'] });
     await library();
     await current.waitForFunction(() => { const img = document.querySelector('[data-action="apps.open.netflix"] img'); return img && img.complete && img.src.includes('missing-native-icon.png'); });
-    check('Known app icon failure keeps initials and the Netflix name', await current.evaluate(() => { const row = document.querySelector('[data-action="apps.open.netflix"]'), img = row.querySelector('img'); return getComputedStyle(img).display === 'none' && getComputedStyle(row.querySelector('.native-icon span')).visibility === 'visible' && row.textContent.includes('Netflix'); }));
+    check('Known app icon failure keeps initials and the Netflix name', await current.evaluate(() => { const row = document.querySelector('[data-action="apps.open.netflix"]'), img = row.querySelector('[data-native-icon]'); return getComputedStyle(img).display === 'none' && getComputedStyle(row.querySelector('.native-icon span')).visibility === 'visible' && row.textContent.includes('Netflix'); }));
     await closePage();
     await page({ catalog: CATALOG.map(a => a.id === IDS[1] ? { ...a, iconPath: 'https://example.invalid/icon.png' } : a) });
     await library();

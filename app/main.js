@@ -44,13 +44,13 @@
     newsreader: { name: 'Newsreader', family: 'Study Newsreader', display: 400, ui: 400, clock: 400 }
   };
   var PRIVATE_FONTS = window.CleanFramePrivateFontIDs || [], fontMetrics = {}, unavailableFonts = {}, widthCache = {}, fontRevision = 0, fontsReady = false;
-  var LOOK_VALUES = { bg: ['dark', 'light', 'photo'], layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], font: Object.keys(FONTS).filter(function (id) { return id === 'manrope' || PRIVATE_FONTS.indexOf(id) >= 0; }), controls: ['icons', 'both', 'text'], focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'], shelf: ['glass', 'clear'], inputStyle: ['text', 'icons', 'both'] };
+  var LOOK_VALUES = { bg: ['dark', 'light', 'photo'], layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], font: Object.keys(FONTS).filter(function (id) { return id === 'manrope' || PRIVATE_FONTS.indexOf(id) >= 0; }), controls: ['icons', 'both', 'text'], focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'], shelf: ['glass', 'clear'], inputStyle: ['text', 'icons', 'both'], inputShelf: ['glass', 'clear'], showDate: ['off', 'on'] };
   var INPUT_ICON_CHOICES = ['auto', 'hdmi', 'switch', 'xbox', 'xbox360', 'kodi'];
   var INPUT_ICON_LABELS = { auto: 'Auto', hdmi: 'HDMI', switch: 'Switch', xbox: 'Xbox', xbox360: 'Xbox 360', kodi: 'Kodi' };
   var PLATE_COLOR = { stremio: '#5b45c6', netflix: '#141414', disneyplus: '#0d1b4c', youtube: '#e11d2e', appletv: '#1c1c1e', primevideo: '#1398ec', abciview: '#0b4ea2', sbs: '#c2410c', applemusic: '#e11d48', spotify: '#128a3e', hbomax: '#5b2db3', tubi: '#2e1a47' };
   var INPUT_HOLD_MS = 520;
-  var LOOK_NAMES = { bg: 'Background', layout: 'Layout', apps: 'Apps', font: 'Font', controls: 'Home controls', focus: 'Focus', material: 'Material', shelf: 'Dock background' };
-  var VALUE_NAMES = { dark: 'Dark', light: 'Light', photo: 'Photo', list: 'List', dock: 'Dock', type: 'Type', glass: 'Glass', soft: 'Soft', frost: 'Frost', tint: 'Clear tint', icons: 'Icons', both: 'Icons and text', text: 'Text', clear: 'Clear' };
+  var LOOK_NAMES = { bg: 'Background', layout: 'Layout', apps: 'Apps', font: 'Font', controls: 'Home controls', focus: 'Focus', material: 'Material', shelf: 'Dock background', inputShelf: 'Input background', showDate: 'Date' };
+  var VALUE_NAMES = { dark: 'Dark', light: 'Light', photo: 'Photo', list: 'List', dock: 'Dock', type: 'Type', glass: 'Glass', soft: 'Soft', frost: 'Frost', tint: 'Clear tint', icons: 'Icons', both: 'Icons and text', text: 'Text', clear: 'Clear', off: 'Off', on: 'On' };
   var UTIL = { apps: ['All apps', 'apps'], arrange: ['Arrange', 'arrange'], settings: ['Settings', 'settings'] };
   var INPUT_PORTS = [1, 2, 3, 4];
   var MSG = {
@@ -89,7 +89,7 @@
     for (var i = 0; i < list.length; i++) if (list[i].toLowerCase() === v) return list[i];
     return fallback;
   }
-  function lookOf(c) { return { bg: c.bg, wall: c.wall, layout: c.layout, apps: c.apps, font: c.font, controls: c.controls, focus: c.focus, material: c.material, shelf: c.shelf || 'glass', inputStyle: c.inputStyle || 'both' }; }
+  function lookOf(c) { return { bg: c.bg, wall: c.wall, layout: c.layout, apps: c.apps, font: c.font, controls: c.controls, focus: c.focus, material: c.material, shelf: c.shelf || 'glass', inputStyle: c.inputStyle || 'both', inputShelf: c.inputShelf || 'glass', showDate: c.showDate || 'off' }; }
   function defaultInputName(port) {
     if (port === 1) return 'HDMI1';
     if (port === 2) return 'HDMI2';
@@ -222,8 +222,7 @@
   function appMark(a, w, h, size, fill) {
     var src = artworkSrc(a), words = a.name.split(/\s+/), letters = words[0].charAt(0) + (words.length > 1 ? words[1].charAt(0) : ''), color = a.icon ? '' : PLATE_COLOR[plateId(a)] || '';
     if (fill && src) {
-      return (a.icon ? '<img class="art-fill" alt="" src="' + esc(src) + '">' : '')
-        + '<span class="mark native-icon art-logo-slot"><span>' + esc(letters.toUpperCase()) + '</span><img class="art-logo" alt="" data-native-icon="true" src="' + esc(src) + '"></span>';
+      return '<span class="mark native-icon art-cover"><span>' + esc(letters.toUpperCase()) + '</span><img class="art-fill" alt="" data-native-icon="true" src="' + esc(src) + '"></span>';
     }
     var monogram = '<span class="mark monogram' + (src ? ' native-icon' : '') + '" style="width:' + w + 'px;height:' + h + 'px;font-size:' + Math.round(size * .65) + 'px' + (color ? ';background:' + color : '') + '"><span>' + esc(letters.toUpperCase()) + '</span>'
       + (src ? '<img class="art-logo" alt="" data-native-icon="true" src="' + esc(src) + '">' : '') + '</span>';
@@ -463,7 +462,8 @@
     return {
       bg: pick(modern.bg, LOOK_VALUES.bg, legacyList ? 'dark' : 'photo'), layout: pick(modern.layout, LOOK_VALUES.layout, legacyList ? 'list' : 'dock'),
       apps: pick(modern.apps, LOOK_VALUES.apps, legacyList ? 'text' : 'both'), controls: pick(modern.controls, LOOK_VALUES.controls, 'both'),
-      focus: pick(modern.focus, LOOK_VALUES.focus, legacyList ? 'type' : 'glass'), material: pick(modern.material, LOOK_VALUES.material, 'soft'), shelf: pick(modern.shelf, LOOK_VALUES.shelf, 'glass'), inputStyle: pick(modern.inputStyle, LOOK_VALUES.inputStyle, 'both'),
+      focus: pick(modern.focus, LOOK_VALUES.focus, legacyList ? 'type' : 'glass'), material: pick(modern.material, LOOK_VALUES.material, 'soft'), shelf: pick(modern.shelf, LOOK_VALUES.shelf, 'glass'), inputStyle: pick(modern.inputStyle, LOOK_VALUES.inputStyle, 'both'), inputShelf: pick(modern.inputShelf, LOOK_VALUES.inputShelf, 'glass'),
+      showDate: pick(modern.showDate, LOOK_VALUES.showDate, 'off'),
       font: pick(modern.font, LOOK_VALUES.font, 'manrope'), wall: wall(modern.wall || s.wallpaper) ? modern.wall || s.wallpaper : WALLS[0].id,
       home: h, recent: recent, lastApp: h.indexOf(s.lastApp) >= 0 ? s.lastApp : h[0],
       mode: pick(s.mode, MODES.map(function (m) { return m.id; }), 'fixed'),
@@ -705,10 +705,18 @@
     var ports = visibleInputs(), p = clamp(t.f.p || 0, 0, Math.max(0, ports.length - 1));
     if (!ports.length) { t.f.zone = 'apps'; return; }
     t.f.p = p;
+    if (S.c.layout === 'list') {
+      if (k === 'up' && p > 0) t.f.p--;
+      else if (k === 'down' && p < ports.length - 1) t.f.p++;
+      else if (k === 'down' || k === 'back') t.f.zone = 'apps';
+      else if (k === 'right') { t.f.zone = 'util'; t.f.u = clamp(S.lastUtil, 0, utils().length - 1); }
+      else if (k === 'ok') perform(inputLabel(ports[p]), function (done) { FrameDevice.setSource(ports[p], done); });
+      return;
+    }
     if (k === 'left' && p > 0) t.f.p--;
     else if (k === 'right' && p < ports.length - 1) t.f.p++;
     else if (k === 'down' || k === 'back') t.f.zone = 'apps';
-    else if (k === 'up' && S.c.layout !== 'list') { t.f.zone = 'util'; t.f.u = clamp(S.lastUtil, 0, utils().length - 1); }
+    else if (k === 'up') { t.f.zone = 'util'; t.f.u = clamp(S.lastUtil, 0, utils().length - 1); }
     else if (k === 'ok') perform(inputLabel(ports[p]), function (done) { FrameDevice.setSource(ports[p], done); });
   }
   function listHomeKey(t, k, i, U) {
@@ -1185,6 +1193,7 @@
       { id: 'apps', title: 'App display', horizontal: true, items: options('apps', ['text', 'icons', 'both']) },
       { id: 'controls', title: 'Home controls', horizontal: true, items: options('controls', ['text', 'icons', 'both']) },
       { id: 'shelf', title: 'Dock background', horizontal: true, items: options('shelf', ['glass', 'clear']) },
+      { id: 'inputShelf', title: 'Input background', horizontal: true, items: options('inputShelf', ['glass', 'clear']) },
       { id: 'inputStyle', title: 'Input display', horizontal: true, items: options('inputStyle', ['text', 'icons', 'both']) },
       { id: 'inputIcons', title: 'Input icons', items: (S.c.inputs || INPUT_PORTS).map(function (port) {
         return { action: 'inputmenu.' + port, label: inputLabel(port), menu: port, valueLabel: inputIconLabel(inputIconChoice(port)) };
@@ -1194,7 +1203,8 @@
     if (t.group === 'focus') return [
       { id: 'focus', title: 'Focus style', horizontal: true, items: options('focus', ['type', 'glass']) },
       { id: 'material', title: 'Material', horizontal: true, items: options('material', ['soft', 'frost', 'tint'], inactive),
-        reason: inactive ? flat ? 'Materials are available with a Photo background.' : 'Choose Glass focus or the Dock layout to use materials.' : '' }
+        reason: inactive ? flat ? 'Materials are available with a Photo background.' : 'Choose Glass focus or the Dock layout to use materials.' : '' },
+      { id: 'showDate', title: 'Date', horizontal: true, items: options('showDate', ['off', 'on']) }
     ];
     if (t.group === 'rotation') return [{ id: 'mode', title: '', items: options('mode', MODES.map(function (m) { return m.id; }), flat),
       reason: flat ? 'Choose Photo in Background to use rotation.' : 'Timed changes pause while Settings or another panel is open.' }];
@@ -1396,7 +1406,7 @@
   function render() {
     var t = top(), sheet = !!V[t.id].sheet, shown = wall(S.shown ? S.shown.wall : S.c.wall), palette = ADAPTIVE_INK[shown.id];
     var adaptive = applyAdaptiveInk(palette), tr = adaptive && palette.tr ? palette.tr.pol : shown.ut.tr, br = adaptive && palette.br ? palette.br.pol : shown.ut.br;
-    stage.className = 'stage bg-' + S.c.bg + ' l-' + S.c.layout + ' v-' + S.variant + ' m-' + (materialApplies() ? S.c.material : 'none') + ' f-' + S.c.focus + ' a-' + S.c.apps + ' u-' + S.c.controls + ' i-' + (S.c.inputStyle || 'both') + ' g-' + S.geom + ' tone-' + shown.tone + ' tr-' + tr + ' br-' + br + wallClasses(shown) + inkRungClasses(palette, adaptive) + ' at-' + t.id + ' font-' + homeFont() + (homeFont() !== 'manrope' ? ' font-custom' : '') + (S.fontSwitch ? ' is-font-switch' : '') + (adaptive ? ' has-adaptive-ink adaptive-tl-' + palette.tl.pol : '') + (!adaptive && shown.clockInk ? ' has-clock-ink' : '') + (!adaptive && shown.dockClockInk ? ' has-dock-clock-ink' : '') + (registeredMaterial(shown.id) ? ' registered-material' : '') + (sheet ? ' is-sheet' : '') + (S.reflow ? ' is-reflow' : '');
+    stage.className = 'stage bg-' + S.c.bg + ' l-' + S.c.layout + ' v-' + S.variant + ' m-' + (materialApplies() ? S.c.material : 'none') + ' f-' + S.c.focus + ' a-' + S.c.apps + ' u-' + S.c.controls + ' i-' + (S.c.inputStyle || 'both') + ' ns-' + (S.c.inputShelf || 'glass') + ' date-' + (S.c.showDate || 'off') + ' g-' + S.geom + ' tone-' + shown.tone + ' tr-' + tr + ' br-' + br + wallClasses(shown) + inkRungClasses(palette, adaptive) + ' at-' + t.id + ' font-' + homeFont() + (homeFont() !== 'manrope' ? ' font-custom' : '') + (S.fontSwitch ? ' is-font-switch' : '') + (adaptive ? ' has-adaptive-ink adaptive-tl-' + palette.tl.pol : '') + (!adaptive && shown.clockInk ? ' has-clock-ink' : '') + (!adaptive && shown.dockClockInk ? ' has-dock-clock-ink' : '') + (registeredMaterial(shown.id) ? ' registered-material' : '') + (sheet ? ' is-sheet' : '') + (S.reflow ? ' is-reflow' : '');
     if (!adaptive && shown.clockInk) stage.style.setProperty('--clock-ink', shown.clockInk);
     else stage.style.removeProperty('--clock-ink');
     if (!adaptive && shown.dockClockInk) stage.style.setProperty('--dock-clock-ink', shown.dockClockInk);
@@ -1434,11 +1444,17 @@
   function renderInputRow(t) {
     var ports = visibleInputs(), focus = t.id === 'home' && t.f.zone === 'inports', list = S.c.layout === 'list';
     var g = dockGeom(Math.max(1, S.c.home.length || 1));
-    var tileW = list ? 280 : g.tw, tileH = list ? 112 : g.th, gap = g.pitch - g.tw, pitch = tileW + gap, html = '';
+    var tileW = g.tw, tileH = g.th, gap = g.pitch - g.tw, pitch = tileW + gap, html = '';
     var total = ports.length ? (ports.length - 1) * pitch + tileW : 0;
-    var origin = list ? 140 : Math.round((1920 - total) / 2), top = list ? 72 : g.y - tileH - 16;
+    var origin = Math.round((1920 - total) / 2), top = g.y - tileH - 16;
+    if (list) {
+      inputRow.className = 'input-row is-empty';
+      inputRow.style.height = '0px';
+      setHTML(inputRow, '');
+      return;
+    }
     if (t.id === 'home' && t.f.zone === 'inports' && !ports.length) t.f.zone = 'apps';
-    inputRow.className = 'input-row' + (list ? ' is-list' : '') + (ports.length ? '' : ' is-empty');
+    inputRow.className = 'input-row' + ((S.c.inputShelf || 'glass') === 'clear' ? ' is-clear' : '') + (ports.length ? '' : ' is-empty');
     inputRow.style.top = top + 'px';
     inputRow.style.height = tileH + 'px';
     ports.forEach(function (port, i) {
@@ -1466,8 +1482,17 @@
     if (!metrics || !metrics.digitCell) return text;
     return text.replace(/[0-9]/g, function (digit) { return '<span class="clock-digit">' + digit + '</span>'; });
   }
+  function dateLine() {
+    var d, text;
+    if ((S.c.showDate || 'off') !== 'on') return '';
+    d = new Date();
+    try { text = d.toLocaleDateString(undefined, { month: 'long', day: 'numeric' }); }
+    catch (e) { text = ''; }
+    return text && !/^\s*$/.test(text) ? text : '';
+  }
   function renderCaption(t, hs) {
-    var html = '<span class="clock">' + clockHtml() + '</span>';
+    var html = '<span class="clock">' + clockHtml() + '</span>', date = dateLine();
+    if (date) html += '<span class="cap-meta">' + esc(date) + '</span>';
     if (S.c.apps !== 'icons' && hs.items[hs.i] && (S.c.layout === 'list' ? photoLabel(hs.items[hs.i].id, false).size < 88 || photoLabel(hs.items[hs.i].id, false).ellipsis : hs.zone === 'apps' && reducedDockLabel(hs.items[hs.i].id))) html += '<span class="cap-line full-name">' + esc(app(hs.items[hs.i].id).name) + '</span>';
     setHTML(caption, html);
   }
@@ -1709,27 +1734,62 @@
     el.style.transformOrigin = (x + width / 2) + 'px ' + (y + height / 2) + 'px';
     el.style.transform = 'translate3d(' + (-x) + 'px,' + (-y) + 'px,0)' + (S.c.bg === 'photo' && S.c.material === 'tint' && !REDUCED_MOTION ? ' scale(1.04)' : '');
   }
+  function inputPlateWidth(port, compact) {
+    var text, size, width;
+    if (S.c.apps === 'icons') return compact ? 168 : 248;
+    text = S.c.apps === 'text';
+    size = compact ? 56 : 88;
+    width = textWidth(inputLabel(port), size, 600, -1.8, 'display');
+    return clamp(Math.ceil(Math.min(compact ? 640 : 992, width) + (text ? 84 : compact ? 156 : 184)), text ? 280 : 360, text ? compact ? 724 : 1076 : compact ? 796 : 1176);
+  }
   function renderList(hs) {
     var items = hs.items, n = items.length, compact = hs.mode === 'arrange', pitch = compact ? PH_COMPACT_PITCH : PH_PITCH;
-    var anchor = clamp(hs.i, 0, Math.max(0, n - 1)), first, off, width, slot, y, s, label, aw, plateState;
+    var ports = compact ? [] : visibleInputs(), lead = ports.length, total = lead + n;
+    var t = top(), inputFocus = !!(t && t.f && t.f.zone === 'inports' && lead);
+    var anchor = inputFocus ? clamp(t.f.p || 0, 0, lead - 1) : lead + clamp(hs.i, 0, Math.max(0, n - 1));
+    var first, off, width, slot, y, s, label, aw, plateState, rows;
     var rowFocus = hs.zone === 'apps' || hs.zone === 'tiles', remembered = hs.zone === 'util' || hs.zone === 'act' || hs.zone === 'ctl' || hs.zone === 'preview';
     photoModeTransition(compact);
     if (compact) {
       first = clamp(scroll.photoArrange, anchor - 7, anchor - 1);
-      first = clamp(first, 0, Math.max(0, n - PH_COMPACT_VISIBLE));
+      first = clamp(first, 0, Math.max(0, total - PH_COMPACT_VISIBLE));
       scroll.photoArrange = first;
+    } else if (hs.zone === 'preview' && anchor <= lead + 2) {
+      first = 0; scroll.photo = 0;
     } else {
       first = clamp(scroll.photo, anchor - 3, anchor - 1);
-      first = clamp(first, 0, Math.max(0, n - PH_FULL));
+      first = clamp(first, 0, Math.max(0, total - PH_FULL));
       scroll.photo = first;
     }
     off = first * pitch; slot = anchor - first;
-    width = items[anchor] ? listPlateWidth(items[anchor].id, compact) : 360;
+    width = inputFocus ? inputPlateWidth(ports[anchor], compact) : (items[anchor - lead] ? listPlateWidth(items[anchor - lead].id, compact) : 360);
     phList.className = 'ph-list' + (compact ? ' is-compact' : '');
     phList.style.height = PH_HEIGHT + 'px';
     phRows.style.top = (compact ? 72 : 148) + 'px';
-    keyed(phRows, items, function (row, it, i) {
-      var typography = photoLabel(it.id, compact), focus = rowFocus && i === anchor, lifted = hs.lifted && i === anchor, markImage, body = '';
+    rows = ports.map(function (port) { return { key: 'in:' + port, kind: 'input', port: port }; }).concat(items);
+    keyed(phRows, rows, function (row, it, i) {
+      var typography, focus, lifted, markImage, body, appIndex, labelText, markW, markH;
+      if (it.port) {
+        labelText = inputLabel(it.port);
+        markW = S.c.apps === 'icons' ? compact ? 64 : 88 : compact ? 60 : 84;
+        markH = S.c.apps === 'icons' ? compact ? 64 : 88 : compact ? 44 : 64;
+        setContent(row, 'in|' + it.port + '|' + labelText + '|' + resolvedInputIcon(it.port) + '|' + S.c.apps + '|' + S.c.inputStyle + '|' + homeFont(), function () {
+          body = '';
+          if (S.c.apps !== 'text') body += '<span class="mark" style="width:' + markW + 'px;height:' + markH + 'px"><img class="ph-input-glyph" alt="" src="' + ICONS + 'inputs/' + resolvedInputIcon(it.port) + '.svg"></span>';
+          if (S.c.apps !== 'icons') body += '<span class="ph-name" style="font-size:' + (compact ? 56 : 88) + 'px;top:' + (compact ? 10.66 : 9.68) + 'px">' + esc(labelText) + '</span>';
+          return '<span class="ph-group">' + body + '</span>';
+        });
+        row.className = 'ph-row k-input' + (inputFocus && i === anchor ? ' is-focus' : '');
+        row.style.width = (compact ? inputPlateWidth(it.port, compact) : 1200) + 'px';
+        row.style.height = pitch + 'px';
+        row.style.transform = 'translate3d(0,' + (i * pitch) + 'px,0)';
+        row.setAttribute('role', 'button');
+        row.setAttribute('aria-label', labelText);
+        attrs(row, 'inport', ports.indexOf(it.port), 'home.input.' + it.port);
+        return;
+      }
+      appIndex = i - lead;
+      typography = photoLabel(it.id, compact); focus = rowFocus && appIndex === hs.i; lifted = hs.lifted && appIndex === hs.i; body = '';
       setContent(row, it.id + '|' + typography.size + '|' + S.c.bg + '|' + S.c.apps + '|' + homeFont(), function () {
         if (S.c.apps !== 'text') body += appMark(app(it.id), S.c.apps === 'icons' ? compact ? 64 : 88 : compact ? 60 : 84, S.c.apps === 'icons' ? compact ? 64 : 88 : compact ? 44 : 64, S.c.apps === 'icons' ? compact ? 52 : 72 : compact ? 42 : 54);
         if (S.c.apps !== 'icons') body += '<span class="ph-name" style="font-size:' + typography.size + 'px;top:' + typography.top + 'px">' + esc(app(it.id).name) + '</span>';
@@ -1740,18 +1800,18 @@
         markImage.onerror = function () { this.style.visibility = 'hidden'; };
         if (markImage.complete && !markImage.naturalWidth) markImage.style.visibility = 'hidden';
       }
-      row.className = 'ph-row k-' + it.kind + (focus ? ' is-focus' : '') + (remembered && i === anchor ? ' is-sel' : '') + (lifted ? ' is-lifted' : '')
-        + (lifted && i === 0 ? ' no-up' : '') + (lifted && i === n - 1 ? ' no-down' : '')
+      row.className = 'ph-row k-' + it.kind + (focus ? ' is-focus' : '') + (remembered && appIndex === hs.i ? ' is-sel' : '') + (lifted ? ' is-lifted' : '')
+        + (lifted && appIndex === 0 ? ' no-up' : '') + (lifted && appIndex === n - 1 ? ' no-down' : '')
         + (it.kind === 'app' && S.press === it.id ? ' is-press' : '');
       row.style.width = (compact ? listPlateWidth(it.id, compact) : 1200) + 'px'; row.style.height = pitch + 'px';
       row.style.transform = 'translate3d(0,' + (i * pitch) + 'px,0)';
       row.setAttribute('role', 'button'); row.setAttribute('aria-label', app(it.id).name);
-      attrs(row, compact ? 'tile' : 'app', i, compact ? 'arrange.' + (it.kind === 'ph' ? 'placeholder.' : 'tile.') + it.id : 'home.app.' + it.id);
+      attrs(row, compact ? 'tile' : 'app', appIndex, compact ? 'arrange.' + (it.kind === 'ph' ? 'placeholder.' : 'tile.') + it.id : 'home.app.' + it.id);
     });
     phRows.style.transform = 'translate3d(0,' + (-off) + 'px,0)';
     y = (compact ? PH_COMPACT_TOP + 2 : PH_TOP + 1) + slot * pitch;
-    plateState = !n || hs.zone === null ? '' : hs.lifted ? 'on-lift' : S.c.focus === 'glass' && rowFocus ? 'on-focus' : S.c.focus === 'glass' && remembered ? 'on-sel' : '';
-    renderPhotoPlate(items[anchor] ? items[anchor].id : '', width, compact ? 88 : 134, y, plateState);
+    plateState = !total || hs.zone === null ? '' : hs.lifted ? 'on-lift' : S.c.focus === 'glass' && (rowFocus || inputFocus) ? 'on-focus' : S.c.focus === 'glass' && remembered ? 'on-sel' : '';
+    renderPhotoPlate(inputFocus ? 'input-' + ports[anchor] : (items[anchor - lead] ? items[anchor - lead].id : ''), width, compact ? 88 : 134, y, plateState);
     if (compact && !hs.lifted && (hs.zone === 'tiles' || hs.zone === 'act') && items[anchor]) {
       s = hs.arr.slots[anchor]; label = (s.removed ? 'Restore ' : 'Remove ') + app(s.id).name; aw = actionWidth(label);
       setHTML(phAction, '<span>' + esc(label) + '</span>');
@@ -1760,8 +1820,8 @@
       phAction.style.transform = 'translate3d(' + (112 + width + 24) + 'px,' + (PH_COMPACT_TOP + slot * pitch + 12) + 'px,0)';
       attrs(phAction, 'act', anchor, 'arrange.' + (s.removed ? 'restore.' : 'remove.') + s.id);
     } else { phAction.className = 'ph-action'; phAction.removeAttribute('data-z'); phAction.removeAttribute('data-action'); }
-    phEmpty.className = 'ph-empty' + (!compact && !n ? ' is-on' : '');
-    setHTML(phEmpty, !compact && !n ? '<p>No apps on Home</p><button type="button" tabindex="-1" class="btn' + (hs.zone === 'empty' ? ' is-focus' : '') + '" data-z="empty" data-i="0" data-action="home.add-apps">' + icon('plus') + '<span>Add apps</span></button>' : '');
+    phEmpty.className = 'ph-empty' + (!compact && !total ? ' is-on' : '');
+    setHTML(phEmpty, !compact && !total ? '<p>No apps on Home</p><button type="button" tabindex="-1" class="btn' + (hs.zone === 'empty' ? ' is-focus' : '') + '" data-z="empty" data-i="0" data-action="home.add-apps">' + icon('plus') + '<span>Add apps</span></button>' : '');
   }
 
   /* Sheets: a frame is built once per view/mode; fill() updates its slots. Persistent

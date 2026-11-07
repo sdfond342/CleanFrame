@@ -533,24 +533,27 @@ try {
       const shape = await current.evaluate(() => {
         const tile = document.querySelector('#dock .tile'), input = document.querySelector('#inputRow .input-tile'), row = document.getElementById('inputRow'), dock = document.getElementById('dock');
         const tr = tile.getBoundingClientRect(), ir = input.getBoundingClientRect(), rr = row.getBoundingClientRect(), dr = dock.getBoundingClientRect();
-        const logo = tile.querySelector('.art-logo'), fill = tile.querySelector('.art-fill');
+        const imgs = [...tile.querySelectorAll('img')];
         const scale = document.getElementById('stage').getBoundingClientRect().width / 1920;
+        const cover = imgs[0] ? imgs[0].getBoundingClientRect() : null;
         return {
           ratio: tr.width / tr.height, radius: parseFloat(getComputedStyle(tile).borderRadius), label: tile.getAttribute('aria-label'),
-          fit: logo ? getComputedStyle(logo).objectFit : '', fill: fill ? getComputedStyle(fill).objectFit : 'plate',
+          count: imgs.length, fit: imgs[0] ? getComputedStyle(imgs[0]).objectFit : '',
+          covers: !!(cover && Math.abs(cover.width - tr.width) < 3 && Math.abs(cover.height - tr.height) < 3),
           gap: (dr.top - rr.bottom) / scale,
           sameBox: Math.abs(tr.width - ir.width) < 1.5 && Math.abs(tr.height - ir.height) < 1.5 && getComputedStyle(tile).borderRadius === getComputedStyle(input).borderRadius
         };
       });
-      check('Home tiles stay rounded rectangles above the input row at ' + width, shape.ratio > 1.6 && shape.radius >= 20 && !!shape.label && shape.fit === 'contain' && shape.fill !== 'fill' && shape.gap >= 8 && shape.sameBox, shape);
+      check('Home tiles stay rounded rectangles above the input row at ' + width, shape.ratio > 1.6 && shape.radius >= 20 && !!shape.label && shape.count === 1 && shape.fit === 'cover' && shape.covers && shape.gap >= 8 && shape.sameBox, shape);
       await look({ layout: 'list' });
-      const listGap = await current.evaluate(() => {
-        const scale = document.getElementById('stage').getBoundingClientRect().width / 1920;
-        const row = document.getElementById('inputRow').getBoundingClientRect();
-        const apps = document.querySelector('.ph-rows').getBoundingClientRect();
-        return (apps.top - row.bottom) / scale;
+      const listRows = await current.evaluate(() => {
+        const names = [...document.querySelectorAll('.ph-row.k-input .ph-name')].map(e => e.textContent.trim());
+        const appName = document.querySelector('.ph-row.k-app .ph-name');
+        const inputStyle = appName ? getComputedStyle(document.querySelector('.ph-row.k-input .ph-name')).fontSize : '';
+        const appStyle = appName ? getComputedStyle(appName).fontSize : '';
+        return { names, chips: document.querySelectorAll('#inputRow .input-tile').length, sameType: inputStyle && inputStyle === appStyle };
       });
-      check('List input row stays above the apps at ' + width, listGap >= 6, listGap);
+      check('List shows inputs as app rows at ' + width, listRows.chips === 0 && listRows.names.join(',') === 'HDMI2,HDMI1,Cinema,HDMI4' && listRows.sameType, listRows);
       await look({ layout: 'dock' });
       await current.screenshot({ path: out + 'home-tiles-' + width + '.png' });
       await look({ apps: 'icons' });
@@ -694,12 +697,12 @@ try {
     await current.reload(); await ready();
     const filled = await current.evaluate(() => ['youtube', 'netflix', 'appletv'].map(id => {
       const tile = document.querySelector('[data-action="home.app.' + id + '"]');
-      const logo = tile.querySelector('.art-logo').getBoundingClientRect();
+      const imgs = [...tile.querySelectorAll('img')];
       const box = tile.getBoundingClientRect();
-      const bg = getComputedStyle(tile).backgroundColor;
-      return { id, src: tile.querySelector('.art-logo').getAttribute('src'), ratio: logo.width / logo.height, centered: Math.abs((logo.left + logo.right) / 2 - (box.left + box.right) / 2), gap: box.width - logo.width, opaque: bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent' };
+      const cover = imgs[0] ? imgs[0].getBoundingClientRect() : null;
+      return { id, count: imgs.length, src: imgs[0] && imgs[0].getAttribute('src'), fit: imgs[0] && getComputedStyle(imgs[0]).objectFit, covers: !!(cover && Math.abs(cover.width - box.width) < 3 && Math.abs(cover.height - box.height) < 3) };
     }));
-    check('YouTube, Netflix and Apple TV plates fill the rectangle around an unstretched mark', filled.every(item => item.src.includes('/plates/' + item.id + '.svg') && Math.abs(item.ratio - 1) < 0.08 && item.centered < 2 && item.gap > 40 && item.opaque), filled);
+    check('YouTube, Netflix and Apple TV use one covering picture', filled.every(item => item.count === 1 && item.src.includes('/plates/' + item.id + '.svg') && item.fit === 'cover' && item.covers), filled);
     for (const width of [1920, 1280]) {
       await current.setViewportSize({ width, height: width * 9 / 16 });
       await scene('home'); await look({ apps: 'both', inputStyle: 'both', layout: 'dock' });
@@ -731,6 +734,41 @@ try {
       await current.screenshot({ path: out + 'icon-menu-open-' + width + '.png' });
       await nav('back', 'back');
     }
+    await current.setViewportSize({ width: 1920, height: 1080 });
+    await look({ layout: 'list', apps: 'both', showDate: 'on' });
+    await scene('home');
+    const lines = await current.evaluate(() => ({
+      date: (document.querySelector('.cap-meta') || {}).textContent || '',
+      weather: document.querySelectorAll('.cap-weather').length,
+      clock: document.querySelector('.clock').textContent.trim(),
+      listInputs: [...document.querySelectorAll('.ph-row.k-input')].map(e => e.getAttribute('aria-label')),
+      chips: document.querySelectorAll('#inputRow .input-tile').length
+    }));
+    check('Date uses the runtime calendar and no weather line is shown', /^\d{1,2}:\d{2}$/.test(lines.clock) && /\p{L}/u.test(lines.date) && /\d/.test(lines.date) && lines.weather === 0, lines);
+    check('List home keeps inputs in the app list', lines.chips === 0 && lines.listInputs.join(',') === 'HDMI1,HDMI2,HDMI3,HDMI4', lines);
+    await current.screenshot({ path: out + 'list-inputs-date-1920.png' });
+    await look({ layout: 'dock', inputShelf: 'clear', showDate: 'off' });
+    await scene('home'); await nav('up');
+    const clearFocus = await current.evaluate(() => {
+      const tile = document.querySelector('#inputRow .input-tile.is-focus');
+      const rest = document.querySelector('#inputRow .input-tile:not(.is-focus)');
+      const focus = tile ? getComputedStyle(tile) : null;
+      const plain = rest ? getComputedStyle(rest) : null;
+      return { saved: ShoreQA.state().look.inputShelf, rest: plain && plain.backgroundColor, focusImage: focus && focus.backgroundImage, focusShadow: focus && focus.boxShadow };
+    });
+    check('Clear input background keeps a visible focus plate', clearFocus.saved === 'clear' && clearFocus.rest === 'rgba(0, 0, 0, 0)' && clearFocus.focusImage !== 'none', clearFocus);
+    await current.screenshot({ path: out + 'input-clear-focus-1920.png' });
+    await group('focus');
+    await current.screenshot({ path: out + 'focus-date-1920.png' });
+    await current.setViewportSize({ width: 1280, height: 720 });
+    await look({ layout: 'list', showDate: 'on' }); await scene('home');
+    await current.screenshot({ path: out + 'list-inputs-1280.png' });
+    await look({ layout: 'dock', inputShelf: 'glass', showDate: 'on' }); await scene('home');
+    await current.screenshot({ path: out + 'dock-date-1280.png' });
+    await look({ layout: 'list' }); await group('layout');
+    const previewInputs = await current.evaluate(() => [...document.querySelectorAll('.ph-row.k-input')].map(e => e.getAttribute('aria-label')));
+    check('List preview includes the inputs as app rows', previewInputs.join(',') === 'HDMI1,HDMI2,HDMI3,HDMI4', previewInputs);
+    await current.screenshot({ path: out + 'layout-list-preview-1280.png' });
   });
   await run('Independent app identity self-filter', async () => {
     const appId = 'AbCdEf1234.MyHome';
@@ -775,15 +813,12 @@ try {
     await scene('home');
     await current.waitForFunction(() => { const img = document.querySelector('[data-action="home.app.netflix"] img'); return img && img.complete && img.naturalWidth > 0; });
     check('Home tile uses the same installed icon', await current.evaluate(() => { const img = document.querySelector('[data-action="home.app.netflix"] img'); return !!img && img.getAttribute('alt') === '' && document.querySelector('[data-action="home.app.netflix"]').getAttribute('aria-label') === 'Netflix'; }));
-    check('A wide tile keeps the installed icon contained', await current.evaluate(() => {
-      const tile = document.querySelector('[data-action="home.app.netflix"]'), img = tile && tile.querySelector('.art-logo'), fill = tile && tile.querySelector('.art-fill');
-      if (!tile || !img || !fill) return false;
-      const tileBox = tile.getBoundingClientRect(), image = img.getBoundingClientRect(), cover = fill.getBoundingClientRect();
-      const bg = getComputedStyle(tile).backgroundColor;
-      const ratio = image.width / image.height;
-      return getComputedStyle(img).objectFit === 'contain' && getComputedStyle(fill).objectFit === 'cover'
-        && tileBox.width > tileBox.height * 1.4 && image.width <= tileBox.width + 1 && image.height <= tileBox.height + 1
-        && Math.abs(ratio - 1) < 0.08 && cover.width >= tileBox.width - 1 && cover.height >= tileBox.height - 1 && bg !== 'rgba(0, 0, 0, 0)';
+    check('A wide tile keeps one installed picture covering the tile', await current.evaluate(() => {
+      const tile = document.querySelector('[data-action="home.app.netflix"]'), imgs = tile ? [...tile.querySelectorAll('img')] : [];
+      if (!tile || imgs.length !== 1) return false;
+      const tileBox = tile.getBoundingClientRect(), cover = imgs[0].getBoundingClientRect();
+      return getComputedStyle(imgs[0]).objectFit === 'cover' && tileBox.width > tileBox.height * 1.4
+        && Math.abs(cover.width - tileBox.width) < 3 && Math.abs(cover.height - tileBox.height) < 3;
     }));
     await editor();
     check('Editor uses the installed icon without dropping the name', await current.evaluate(() => { const row = document.querySelector('[data-action="editor.move.netflix"]'); const img = row && row.querySelector('img'); return !!img && img.complete && img.naturalWidth > 0 && row.textContent.includes('Netflix'); }));
@@ -881,9 +916,9 @@ try {
     check('Overview has the settings groups', same((await call('actions')).filter(a => expected.includes(a)).sort(), expected.slice().sort()));
     const specs = {
       background: { bg: ['dark', 'light', 'photo'] },
-      layout: { layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], controls: ['icons', 'both', 'text'], shelf: ['glass', 'clear'], inputStyle: ['text', 'icons', 'both'] },
+      layout: { layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], controls: ['icons', 'both', 'text'], shelf: ['glass', 'clear'], inputShelf: ['glass', 'clear'], inputStyle: ['text', 'icons', 'both'] },
       typography: { font: (await state()).fonts.available },
-      focus: { focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'] }
+      focus: { focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'], showDate: ['off', 'on'] }
     };
     for (const [name, axes] of Object.entries(specs)) {
       await group(name);
